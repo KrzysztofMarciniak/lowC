@@ -1,0 +1,21 @@
+void test_unsigned() {
+    u1 a = 1;
+    u2 b = 2;
+    u4 c = 4;
+    u8 d = 8;
+    u16 e = 16;
+    u32 f = 32;
+    u64 g = 64;
+    return;
+}
+
+void test_signed() {
+    s1 a = 1;
+    s2 b = 2;
+    s4 c = 4;
+    s8 d = 8;
+    s16 e = 16;
+    s32 f = 32;
+    s64 g = 64;
+    return;
+}

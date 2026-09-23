@@ -1,0 +1,21 @@
+struct Point {
+s64 x;
+s64 y;
+};
+
+s64 main() {
+Point points[3];
+
+points[0].x = 10;
+points[0].y = 20;
+
+points[1].x = 30;
+points[1].y = 40;
+
+points[2].x = 50;
+points[2].y = 60;
+
+return points[1].x + points[1].y;
+
+}
+

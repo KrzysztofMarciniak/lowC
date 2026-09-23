@@ -1,0 +1,8 @@
+void foo() {
+    return;
+}
+
+s64 main() {
+    foo();
+    return 0;
+}

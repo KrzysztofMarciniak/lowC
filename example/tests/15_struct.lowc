@@ -1,0 +1,11 @@
+struct Point {
+    s64 x;
+    s64 y;
+};
+
+s64 main() {
+    struct Point p;
+    p.x = 10;
+    p.y = 20;
+    return p.x + p.y;
+}

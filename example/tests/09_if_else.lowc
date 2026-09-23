@@ -1,0 +1,9 @@
+s64 main() {
+    s64 x = 10;
+    if (x > 20) {
+        x = 30;
+    } else {
+        x = 40;
+    }
+    return x;
+}

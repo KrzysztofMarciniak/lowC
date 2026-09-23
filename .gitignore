@@ -1,0 +1,13 @@
+/build/
+
+/*.o
+*.o
+*.d
+
+*.lowc~
+*.lowh~
+
+*.swp
+*.swo
+
+.DS_Store

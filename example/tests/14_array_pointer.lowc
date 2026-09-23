@@ -1,0 +1,8 @@
+s64 main() {
+    s64 values[5];
+    s64 *p;
+    p = &values[0];
+    *p = 10;
+    *(p + 1) = 20;
+    return values[1];
+}

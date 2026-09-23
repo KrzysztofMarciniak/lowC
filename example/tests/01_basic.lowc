@@ -1,0 +1,3 @@
+s64 entrypoint() {
+	return 128;
+}

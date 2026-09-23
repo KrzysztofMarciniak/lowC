@@ -1,0 +1,10 @@
+s64 main() {
+    s64 a = 10;
+    s64 b = 20;
+    s64 result;
+    result = (a + b);
+    result = (a + b) * 2;
+    result = a * (b + 5);
+    result = (a + b) * (a - b);
+    return result;
+}

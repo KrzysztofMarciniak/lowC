@@ -1,0 +1,6 @@
+s64 main() {
+    s64 x = 10;
+    s64 a = +x;
+    s64 b = -x;
+    return b;
+}

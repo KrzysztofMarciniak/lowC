@@ -1,0 +1,40 @@
+struct Point {
+    s64 x;
+    s64 y;
+};
+
+s64 add(s64 a, s64 b) {
+    return a + b;
+}
+
+void process() {
+    s64 values[5];
+    s64 *ptr;
+    struct Point point;
+
+    values[0] = 10;
+    values[1] = 20;
+    ptr = values;
+
+    *ptr = *ptr + 5;
+
+    point.x = values[0];
+    point.y = values[1];
+
+    if (point.x < point.y && point.y != 0) {
+        point.x = add(point.x, point.y);
+    } else {
+        point.x = point.x - 1;
+    }
+
+    for (s64 i = 0; i < 5; i = i + 1) {
+        values[i] = values[i] + 1;
+    }
+
+    return;
+}
+
+s64 main() {
+    process();
+    return 0;
+}
