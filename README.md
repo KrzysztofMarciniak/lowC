@@ -18,6 +18,8 @@ Build the compiler with `make`:
 make
 ```
 
+New to lowC? Run `make quick_start` for a hand-holding introduction to the language, followed by compiling and running a small example. The guide is also available in [`QUICK_START.md`](QUICK_START.md).
+
 Install the compiler as `/usr/local/bin/lowc` (use `sudo` if needed), or choose a different prefix:
 
 ```sh

@@ -4,6 +4,8 @@
 #include "target/x86_64/context.h"
 #include "target/x86_64/function.h"
 
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,6 +90,154 @@ codegen_make_label(
     return codegen_strdup(buffer);
 }
 
+static int
+codegen_constant_integer(
+    ast *expression,
+    long long *value
+)
+{
+    char *end;
+
+    if (!expression || !value) {
+        return 0;
+    }
+
+    if (expression->type == AST_UNARY) {
+        if (
+            expression->unary.operator != AST_UNARY_MINUS &&
+            expression->unary.operator != AST_UNARY_PLUS
+        ) {
+            return 0;
+        }
+        if (!codegen_constant_integer(
+                expression->unary.operand,
+                value
+            )) {
+            return 0;
+        }
+        if (expression->unary.operator == AST_UNARY_MINUS) {
+            if (*value == LLONG_MIN) {
+                return 0;
+            }
+            *value = -*value;
+        }
+        return 1;
+    }
+
+    if (expression->type != AST_INTEGER) {
+        return 0;
+    }
+
+    errno = 0;
+    *value = strtoll(expression->integer.value, &end, 10);
+    return errno == 0 && *end == '\0';
+}
+
+static const char *
+codegen_global_data_directive(
+    unsigned long size
+)
+{
+    switch (size) {
+        case 1:
+            return ".byte";
+        case 2:
+            return ".word";
+        case 4:
+            return ".long";
+        case 8:
+            return ".quad";
+        default:
+            return NULL;
+    }
+}
+
+static int
+codegen_emit_global(
+    codegen_context *context,
+    ast *global
+)
+{
+    codegen_x86_64_context layout;
+    unsigned long size;
+    unsigned long alignment;
+    const char *directive;
+    long long initializer;
+
+    codegen_x86_64_context_init(&layout, &context->output);
+    layout.structs = context->structs;
+
+    size = codegen_x86_64_context_type_size(
+        &layout,
+        global->variable.type,
+        global->variable.pointer_depth
+    );
+    alignment = codegen_x86_64_context_type_alignment(
+        &layout,
+        global->variable.type,
+        global->variable.pointer_depth
+    );
+
+    if (global->variable.array_length) {
+        size *= strtoul(
+            global->variable.array_length->integer.value,
+            NULL,
+            10
+        );
+    }
+
+    if (size == 0) {
+        codegen_fail(context, "cannot determine global variable size");
+        return 1;
+    }
+
+    if (global->variable.value) {
+        directive = codegen_global_data_directive(size);
+        if (
+            !directive ||
+            global->variable.array_length ||
+            !codegen_constant_integer(
+                global->variable.value,
+                &initializer
+            )
+        ) {
+            codegen_fail(
+                context,
+                "global initializer must be a scalar integer constant"
+            );
+            return 1;
+        }
+
+        codegen_output_printf(
+            &context->output,
+            ".data\n.align %lu\n.globl %s\n.type %s, @object\n.size %s, %lu\n%s:\n    %s %lld\n",
+            alignment,
+            global->variable.name,
+            global->variable.name,
+            global->variable.name,
+            size,
+            global->variable.name,
+            directive,
+            initializer
+        );
+    } else {
+        codegen_output_printf(
+            &context->output,
+            ".bss\n.align %lu\n.globl %s\n.type %s, @object\n.size %s, %lu\n%s:\n    .zero %lu\n",
+            alignment,
+            global->variable.name,
+            global->variable.name,
+            global->variable.name,
+            size,
+            global->variable.name,
+            size
+        );
+    }
+
+    codegen_x86_64_context_free(&layout);
+    return 0;
+}
+
 
 int
 codegen_generate_node(
@@ -104,6 +254,21 @@ codegen_generate_node(
     switch (node->type){
 
         case AST_PROGRAM:
+
+            for (
+                i = 0;
+                i < node->program.globals.count;
+                i++
+            ) {
+                if (codegen_emit_global(
+                        context,
+                        node->program.globals.values[i]
+                    )) {
+                    return 1;
+                }
+            }
+
+            codegen_output_write(&context->output, ".text\n");
 
             /*
              * Generate every function in the program.
@@ -142,6 +307,7 @@ codegen_generate_node(
             x86_context.optimize = context->optimize;
             x86_context.label_count = context->label_counter;
             x86_context.structs = context->structs;
+            x86_context.globals = context->globals;
             x86_context.functions = context->functions;
 
             codegen_x86_64_function(
@@ -184,6 +350,7 @@ codegen_generate_program(
 
     if (tree->type == AST_PROGRAM) {
         context->structs = &tree->program.structs;
+        context->globals = &tree->program.globals;
         context->functions = &tree->program.functions;
     }
 

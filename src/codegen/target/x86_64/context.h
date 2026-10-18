@@ -117,6 +117,7 @@ typedef struct codegen_x86_64_context
      */
     codegen_x86_64_local_list locals;
     ast_list *structs;
+    ast_list *globals;
     ast_list *functions;
 
 
@@ -212,6 +213,12 @@ codegen_x86_64_context_type_alignment(
 
 ast *
 codegen_x86_64_find_struct(
+    codegen_x86_64_context *context,
+    const char *name
+);
+
+ast *
+codegen_x86_64_find_global(
     codegen_x86_64_context *context,
     const char *name
 );

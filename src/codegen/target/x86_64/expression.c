@@ -58,7 +58,28 @@ expression_pointee_size(
 
 
     if (!local) {
-        return 0;
+        ast *global = codegen_x86_64_find_global(
+            context,
+            expression->identifier.name
+        );
+        if (!global) {
+            return 0;
+        }
+        if (global->variable.array_length != NULL) {
+            return codegen_x86_64_context_type_size(
+                context,
+                global->variable.type,
+                global->variable.pointer_depth
+            );
+        }
+        if (global->variable.pointer_depth == 0) {
+            return 0;
+        }
+        return codegen_x86_64_context_type_size(
+            context,
+            global->variable.type,
+            global->variable.pointer_depth - 1
+        );
     }
 
     if (local->array_count != 0) {
@@ -149,12 +170,23 @@ codegen_x86_64_expression_type(
                 context,
                 expression->identifier.name
             );
-            if (!local) {
-                return 0;
+            if (local) {
+                *type = local->type;
+                *pointer_depth = local->pointer_depth;
+                return 1;
             }
-            *type = local->type;
-            *pointer_depth = local->pointer_depth;
-            return 1;
+            {
+                ast *global = codegen_x86_64_find_global(
+                    context,
+                    expression->identifier.name
+                );
+                if (!global) {
+                    return 0;
+                }
+                *type = global->variable.type;
+                *pointer_depth = global->variable.pointer_depth;
+                return 1;
+            }
 
         case AST_INTEGER:
             *type = "s64";
@@ -336,6 +368,20 @@ emit_load_from_rax(
         return;
     }
 
+    if (size == 4) {
+        if (codegen_x86_64_type_signed(type, pointer_depth)) {
+            codegen_output_write(
+                context->output,
+                "    movsxd rax, DWORD PTR [rax]\n"
+            );
+        } else {
+            codegen_output_write(
+                context->output,
+                "    mov eax, DWORD PTR [rax]\n"
+            );
+        }
+        return;
+    }
 
     if (
         codegen_x86_64_type_signed(
@@ -400,6 +446,7 @@ emit_variable(
 )
 {
     codegen_x86_64_local *local;
+    ast *global;
 
 
     local =
@@ -410,10 +457,27 @@ emit_variable(
 
 
     if (!local){
-        /*
-         * Semantic analysis should normally guarantee
-         * that this cannot happen.
-         */
+        global = codegen_x86_64_find_global(
+            context,
+            expression->identifier.name
+        );
+        if (!global) {
+            return;
+        }
+
+        codegen_output_printf(
+            context->output,
+            "    lea rax, [rip + %s]\n",
+            global->variable.name
+        );
+
+        if (global->variable.array_length == NULL) {
+            emit_load_from_rax(
+                context,
+                global->variable.type,
+                global->variable.pointer_depth
+            );
+        }
         return;
     }
 
@@ -1353,6 +1417,18 @@ codegen_x86_64_lvalue_address(
 
 
             if (!local){
+                ast *global = codegen_x86_64_find_global(
+                    context,
+                    expression->identifier.name
+                );
+                if (!global) {
+                    return;
+                }
+                codegen_output_printf(
+                    context->output,
+                    "    lea rax, [rip + %s]\n",
+                    global->variable.name
+                );
                 return;
             }
 

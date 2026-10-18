@@ -384,6 +384,29 @@ codegen_x86_64_find_struct(
 }
 
 ast *
+codegen_x86_64_find_global(
+    codegen_x86_64_context *context,
+    const char *name
+)
+{
+    if (!context || !context->globals || !name) {
+        return NULL;
+    }
+
+    for (unsigned long index = 0;
+         index < context->globals->count;
+         index++)
+    {
+        ast *global = context->globals->values[index];
+        if (strcmp(global->variable.name, name) == 0) {
+            return global;
+        }
+    }
+
+    return NULL;
+}
+
+ast *
 codegen_x86_64_find_struct_field(
     ast *structure,
     const char *name

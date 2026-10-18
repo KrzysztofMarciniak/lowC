@@ -1,6 +1,10 @@
-#include "math.lowc" : "add";
+#include "math.lowc" : "add", "sub";
+
+s64 module_math() {
+    return add(10, 20) + sub(30, 10);
+}
 
 void entrypoint() {
-    s64 result = add(10, 20);
+    s64 result = module_math();
     return;
 }

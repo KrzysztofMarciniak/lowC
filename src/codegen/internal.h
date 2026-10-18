@@ -17,6 +17,7 @@ typedef struct codegen_context
     int optimize;
     int executable;
     ast_list *structs;
+    ast_list *globals;
     ast_list *functions;
 
 } codegen_context;

@@ -1,0 +1,45 @@
+struct Point {
+    s64 x;
+    s64 y;
+};
+
+s64 add(s64 left, s64 right) {
+    return left + right;
+}
+
+void entrypoint() {
+    s8 small_signed;
+    u32 count = 3;
+    s64 total = 40;
+
+    total = total + 2;
+
+    if (total == 42) {
+        total = total + 1;
+    } else {
+        total = 0;
+    }
+
+    for (s64 i = 0; i < count; i = i + 1) {
+        total = total + i;
+    }
+
+    s64 values[3];
+    values[0] = 10;
+    values[1] = 20;
+
+    s64 *pointer;
+    pointer = &values[0];
+    *pointer = *pointer + 1;
+
+    struct Point point;
+    point.x = 10;
+    point.y = 20;
+
+    struct Point *point_pointer;
+    point_pointer = &point;
+    point_pointer->x = 30;
+
+    s64 answer = add(20, 22);
+    return;
+}

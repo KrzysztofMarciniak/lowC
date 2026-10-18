@@ -10,10 +10,13 @@ cleanup() {
     rm -f "$TEMP_DIR/program with space" \
         "$TEMP_DIR/program-unoptimized" \
         "$TEMP_DIR/module-program" \
+        "$TEMP_DIR/modules-program" \
         "$TEMP_DIR/optimized.s" \
         "$TEMP_DIR/unoptimized.s" \
         "$TEMP_DIR/harness" \
-        "$TEMP_DIR/harness-unoptimized"
+        "$TEMP_DIR/harness-unoptimized" \
+        "$TEMP_DIR/modules.s" \
+        "$TEMP_DIR/modules-harness"
     rmdir "$TEMP_DIR"
 }
 trap cleanup EXIT
@@ -46,6 +49,30 @@ if ! "$BIN" "$SCRIPT_DIR/21_modules.lowc" -o "$TEMP_DIR/module-program" ||
    ! "$TEMP_DIR/module-program"
 then
     echo "FAIL [modules] imported executable did not build and run"
+    exit 1
+fi
+
+if ! "$BIN" --asm "$SCRIPT_DIR/24_modules.lowc" >"$TEMP_DIR/modules.s"; then
+    echo "FAIL [modules] could not generate assembly for imported declarations"
+    exit 1
+fi
+
+if ! cc -x assembler "$TEMP_DIR/modules.s" -x c \
+    "$SCRIPT_DIR/module_harness.c" -o "$TEMP_DIR/modules-harness"
+then
+    echo "FAIL [modules] imported declarations did not assemble and link"
+    exit 1
+fi
+
+if ! "$TEMP_DIR/modules-harness"; then
+    echo "FAIL [modules] imported functions, structs, or globals returned incorrect results"
+    exit 1
+fi
+
+if ! "$BIN" "$SCRIPT_DIR/24_modules.lowc" -o "$TEMP_DIR/modules-program" ||
+   ! "$TEMP_DIR/modules-program"
+then
+    echo "FAIL [modules] imported declarations did not build and run as an executable"
     exit 1
 fi
 
@@ -84,4 +111,5 @@ if ! "$TEMP_DIR/harness-unoptimized"; then
     exit 1
 fi
 
+echo "ok   [modules] imported functions, structs, and globals assemble, link, and run"
 echo "ok   [executable] optimized and unoptimized output assembles, links, and runs"
