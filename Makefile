@@ -14,7 +14,9 @@ CFLAGS := \
 	-Os \
 	-flto \
 	-ffunction-sections \
-	-fdata-sections
+	-fdata-sections \
+	-fno-unwind-tables \
+	-fno-asynchronous-unwind-tables
 
 DEBUG_CFLAGS := \
 	-std=c11 \
@@ -36,7 +38,7 @@ OBJECTS := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
 DEPFILES := $(OBJECTS:.o=.d)
 CONFIG_STAMP := $(BUILD_DIR)/.config
 
-.PHONY: all clean debug install quick_start release FORCE
+.PHONY: all clean debug install portable quick_start release FORCE
 
 FORCE:
 
@@ -52,6 +54,9 @@ release: $(TARGET)
 
 debug:
 	$(MAKE) BUILD_DIR=build/debug CFLAGS="$(DEBUG_CFLAGS)" LDFLAGS= all
+
+portable:
+	$(MAKE) BUILD_DIR=build/portable CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS) -static" all
 
 quick_start: $(TARGET)
 	@cat QUICK_START.md
