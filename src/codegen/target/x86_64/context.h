@@ -2,6 +2,7 @@
 #define LOWC_CODEGEN_TARGET_X86_64_CONTEXT_H
 
 #include "../../output.h"
+#include "../../../parser/public.h"
 
 
 /*
@@ -115,6 +116,8 @@ typedef struct codegen_x86_64_context
      * Function locals and parameters.
      */
     codegen_x86_64_local_list locals;
+    ast_list *structs;
+    ast_list *functions;
 
 
     /*
@@ -134,6 +137,10 @@ typedef struct codegen_x86_64_context
      * Temporary labels used by this backend.
      */
     unsigned long label_count;
+    unsigned long epilogue_label;
+    int has_epilogue_label;
+
+    int optimize;
 
 } codegen_x86_64_context;
 
@@ -187,6 +194,40 @@ codegen_x86_64_local *
 codegen_x86_64_find_local(
     codegen_x86_64_context *context,
     const char *name
+);
+
+unsigned long
+codegen_x86_64_context_type_size(
+    codegen_x86_64_context *context,
+    const char *type,
+    unsigned long pointer_depth
+);
+
+unsigned long
+codegen_x86_64_context_type_alignment(
+    codegen_x86_64_context *context,
+    const char *type,
+    unsigned long pointer_depth
+);
+
+ast *
+codegen_x86_64_find_struct(
+    codegen_x86_64_context *context,
+    const char *name
+);
+
+ast *
+codegen_x86_64_find_struct_field(
+    ast *structure,
+    const char *name
+);
+
+int
+codegen_x86_64_struct_field_offset(
+    codegen_x86_64_context *context,
+    const char *struct_name,
+    const char *field_name,
+    unsigned long *offset
 );
 
 #endif

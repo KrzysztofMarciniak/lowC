@@ -82,7 +82,7 @@ emit_type(
     }
 
 
-    codegen_output_write(
+    codegen_output_printf(
         output,
         type
     );
@@ -229,14 +229,16 @@ collect_locals(
 
 
             size =
-                codegen_x86_64_type_size(
+                codegen_x86_64_context_type_size(
+                    context,
                     statement->variable.type,
                     statement->variable.pointer_depth
                 );
 
 
             alignment =
-                codegen_x86_64_type_alignment(
+                codegen_x86_64_context_type_alignment(
+                    context,
                     statement->variable.type,
                     statement->variable.pointer_depth
                 );
@@ -516,7 +518,7 @@ reset_function_locals(
 
     context->stack_size = 0;
     context->stack_depth = 0;
-    context->label_count = 0;
+    context->has_epilogue_label = 0;
 }
 
 
@@ -569,14 +571,16 @@ codegen_x86_64_function(
 
 
         unsigned long size =
-            codegen_x86_64_type_size(
+            codegen_x86_64_context_type_size(
+                context,
                 parameter->parameter.type,
                 parameter->parameter.pointer_depth
             );
 
 
         unsigned long alignment =
-            codegen_x86_64_type_alignment(
+            codegen_x86_64_context_type_alignment(
+                context,
                 parameter->parameter.type,
                 parameter->parameter.pointer_depth
             );
@@ -616,6 +620,9 @@ codegen_x86_64_function(
             context->stack_size,
             16
         );
+
+    context->epilogue_label = context->label_count++;
+    context->has_epilogue_label = 1;
 
 
     /*
@@ -736,17 +743,17 @@ codegen_x86_64_function(
      * Function epilogue
      * ------------------------------------------------------------
      */
-    codegen_output_write(
+    codegen_output_printf(
         context->output,
         "\n"
-        ".L_function_epilogue:\n"
+        ".L%lu:\n"
         "    # ------------------------------------------------------------\n"
         "    # function epilogue\n"
         "    # source: end of function\n"
         "    # ------------------------------------------------------------\n"
         "    leave\n"
         "    ret\n"
-        "\n"
+        "\n",
+        context->epilogue_label
     );
 }
-

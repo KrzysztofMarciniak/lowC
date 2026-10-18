@@ -1,5 +1,6 @@
 #include "math.lowc" : "add";
 
-s64 main() {
-    return add(10, 20);
+void entrypoint() {
+    s64 result = add(10, 20);
+    return;
 }

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "internal.h"
 
 
@@ -74,6 +75,30 @@ main_arg_handler_split(
             continue;
         }
 
+        if (!end_of_flags &&
+            strcmp(argument, "-o") == 0)
+        {
+            main_arg_handler_rotate(
+                argv,
+                flag_position,
+                position
+            );
+
+            flag_position++;
+            (*flag_count)++;
+
+            main_arg_handler_rotate(
+                argv,
+                flag_position,
+                position + 1
+            );
+
+            flag_position++;
+            (*flag_count)++;
+            position++;
+
+            continue;
+        }
 
         if (!end_of_flags &&
             main_arg_handler_is_flag(argument))
@@ -109,14 +134,7 @@ main_arg_handler_internal(
 
     int flag_count;
     int file_count;
-
-
-    flags_result.count = 0;
-    flags_result.values = 0;
-
-    files_result.count = 0;
-    files_result.values = 0;
-
+    int end_of_flags;
 
     if (argc < 1 || argv == 0)
     {
@@ -126,7 +144,6 @@ main_arg_handler_internal(
         };
     }
 
-
     if (flags == 0 || files == 0)
     {
         return (main_arg_handler_result) {
@@ -134,6 +151,38 @@ main_arg_handler_internal(
             .error_text = "invalid output pointers."
         };
     }
+
+    end_of_flags = 0;
+    for (int index = 1; index < argc; index++)
+    {
+        if (!end_of_flags && strcmp(argv[index], "--") == 0) {
+            end_of_flags = 1;
+            continue;
+        }
+
+        if (
+            !end_of_flags &&
+            strcmp(argv[index], "-o") == 0 &&
+            index + 1 >= argc
+        )
+        {
+            return (main_arg_handler_result) {
+                .error = 1,
+                .error_text = "missing output path after -o."
+            };
+        }
+
+        if (!end_of_flags && strcmp(argv[index], "-o") == 0) {
+            index++;
+        }
+    }
+
+
+    flags_result.count = 0;
+    flags_result.values = 0;
+
+    files_result.count = 0;
+    files_result.values = 0;
 
 
     main_arg_handler_split(

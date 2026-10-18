@@ -3,7 +3,11 @@
 
 #include "../../output.h"
 
+#include <errno.h>
+#include <inttypes.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 /*
@@ -53,19 +57,242 @@ expression_pointee_size(
         );
 
 
-    if (
-        !local ||
-        local->pointer_depth == 0
-    ){
+    if (!local) {
         return 0;
     }
 
+    if (local->array_count != 0) {
+        return codegen_x86_64_context_type_size(
+            context,
+            local->type,
+            local->pointer_depth
+        );
+    }
 
-    return
-        codegen_x86_64_type_size(
+    if (local->pointer_depth == 0) {
+        return 0;
+    }
+
+    return codegen_x86_64_context_type_size(
+            context,
             local->type,
             local->pointer_depth - 1
         );
+}
+
+static ast *
+expression_struct_field(
+    codegen_x86_64_context *context,
+    ast *expression,
+    int pointer_member
+)
+{
+    const char *type;
+    unsigned long pointer_depth;
+    ast *structure;
+    const char *field_name;
+
+    if (!expression) {
+        return NULL;
+    }
+
+    if (pointer_member) {
+        type = NULL;
+        pointer_depth = 0;
+        if (!codegen_x86_64_expression_type(
+                context,
+                expression->pointer_member.object,
+                &type,
+                &pointer_depth
+            ) ||
+            pointer_depth == 0) {
+            return NULL;
+        }
+        pointer_depth--;
+        field_name = expression->pointer_member.name;
+    } else {
+        type = NULL;
+        pointer_depth = 0;
+        if (!codegen_x86_64_expression_type(
+                context,
+                expression->member.object,
+                &type,
+                &pointer_depth
+            ) ||
+            pointer_depth != 0) {
+            return NULL;
+        }
+        field_name = expression->member.name;
+    }
+
+    structure = codegen_x86_64_find_struct(context, type);
+    return codegen_x86_64_find_struct_field(structure, field_name);
+}
+
+int
+codegen_x86_64_expression_type(
+    codegen_x86_64_context *context,
+    ast *expression,
+    const char **type,
+    unsigned long *pointer_depth
+)
+{
+    codegen_x86_64_local *local;
+
+    if (!context || !expression || !type || !pointer_depth) {
+        return 0;
+    }
+
+    switch (expression->type) {
+        case AST_IDENTIFIER:
+            local = codegen_x86_64_find_local(
+                context,
+                expression->identifier.name
+            );
+            if (!local) {
+                return 0;
+            }
+            *type = local->type;
+            *pointer_depth = local->pointer_depth;
+            return 1;
+
+        case AST_INTEGER:
+            *type = "s64";
+            *pointer_depth = 0;
+            return 1;
+
+        case AST_UNARY:
+            if (!codegen_x86_64_expression_type(
+                    context,
+                    expression->unary.operand,
+                    type,
+                    pointer_depth
+                )) {
+                return 0;
+            }
+            if (expression->unary.operator == AST_UNARY_ADDRESS) {
+                (*pointer_depth)++;
+            } else if (
+                expression->unary.operator == AST_UNARY_DEREFERENCE
+            ) {
+                if (*pointer_depth == 0) {
+                    return 0;
+                }
+                (*pointer_depth)--;
+            } else if (expression->unary.operator == AST_UNARY_NOT) {
+                *type = "u1";
+                *pointer_depth = 0;
+            }
+            return 1;
+
+        case AST_BINARY:
+            if (
+                expression->binary.operator == AST_BINARY_AND ||
+                expression->binary.operator == AST_BINARY_OR ||
+                expression->binary.operator == AST_BINARY_EQUAL ||
+                expression->binary.operator == AST_BINARY_NOT_EQUAL ||
+                expression->binary.operator == AST_BINARY_LESS ||
+                expression->binary.operator == AST_BINARY_LESS_EQUAL ||
+                expression->binary.operator == AST_BINARY_GREATER ||
+                expression->binary.operator == AST_BINARY_GREATER_EQUAL
+            ) {
+                *type = "u1";
+                *pointer_depth = 0;
+                return 1;
+            }
+            if (
+                expression->binary.operator == AST_BINARY_ADD ||
+                expression->binary.operator == AST_BINARY_SUBTRACT
+            ) {
+                if (codegen_x86_64_expression_type(
+                        context,
+                        expression->binary.left,
+                        type,
+                        pointer_depth
+                    ) &&
+                    *pointer_depth != 0) {
+                    return 1;
+                }
+                if (codegen_x86_64_expression_type(
+                        context,
+                        expression->binary.right,
+                        type,
+                        pointer_depth
+                    ) &&
+                    *pointer_depth != 0) {
+                    return 1;
+                }
+            }
+            *type = "s64";
+            *pointer_depth = 0;
+            return 1;
+
+        case AST_INDEX:
+            if (!codegen_x86_64_expression_type(
+                    context,
+                    expression->index.object,
+                    type,
+                    pointer_depth
+                )) {
+                return 0;
+            }
+            if (*pointer_depth != 0) {
+                (*pointer_depth)--;
+            }
+            return 1;
+
+        case AST_MEMBER:
+        case AST_POINTER_MEMBER:
+        {
+            ast *field = expression_struct_field(
+                context,
+                expression,
+                expression->type == AST_POINTER_MEMBER
+            );
+            if (!field) {
+                return 0;
+            }
+            *type = field->struct_field.type;
+            *pointer_depth = field->struct_field.pointer_depth;
+            return 1;
+        }
+
+        case AST_ASSIGNMENT:
+            return codegen_x86_64_expression_type(
+                context,
+                expression->assignment.left,
+                type,
+                pointer_depth
+            );
+
+        case AST_CALL:
+            if (
+                !context->functions ||
+                !expression->call.function ||
+                expression->call.function->type != AST_IDENTIFIER
+            ) {
+                return 0;
+            }
+            for (unsigned long index = 0;
+                 index < context->functions->count;
+                 index++)
+            {
+                ast *function = context->functions->values[index];
+                if (strcmp(
+                        function->function.name,
+                        expression->call.function->identifier.name
+                    ) == 0) {
+                    *type = function->function.return_type;
+                    *pointer_depth =
+                        function->function.return_pointer_depth;
+                    return 1;
+                }
+            }
+            return 0;
+
+        default:
+            return 0;
+    }
 }
 
 
@@ -92,7 +319,8 @@ emit_load_from_rax(
      * Any pointer is an eight-byte value on x86-64.
      */
     size =
-        codegen_x86_64_type_size(
+        codegen_x86_64_context_type_size(
+            context,
             type,
             pointer_depth
         );
@@ -776,6 +1004,9 @@ emit_unary(
 
 
         case AST_UNARY_DEREFERENCE:
+        {
+            const char *type;
+            unsigned long pointer_depth;
 
             /*
              * The operand evaluates to an address.
@@ -785,19 +1016,17 @@ emit_unary(
                 expression->unary.operand
             );
 
-
-            /*
-             * The exact pointed-to type belongs to semantic
-             * analysis. Until expression types are carried into
-             * code generation, use an eight-byte load.
-             */
-            emit_load_from_rax(
-                context,
-                "u64",
-                0
-            );
+            if (codegen_x86_64_expression_type(
+                    context,
+                    expression,
+                    &type,
+                    &pointer_depth
+                )) {
+                emit_load_from_rax(context, type, pointer_depth);
+            }
 
             return;
+        }
     }
 }
 
@@ -815,6 +1044,9 @@ emit_index(
     ast *expression
 )
 {
+    const char *type;
+    unsigned long pointer_depth;
+
     /*
      * First calculate the address of the element.
      */
@@ -824,15 +1056,14 @@ emit_index(
     );
 
 
-    /*
-     * Exact element type information will eventually come
-     * from semantic analysis.
-     */
-    emit_load_from_rax(
-        context,
-        "u64",
-        0
-    );
+    if (codegen_x86_64_expression_type(
+            context,
+            expression,
+            &type,
+            &pointer_depth
+        )) {
+        emit_load_from_rax(context, type, pointer_depth);
+    }
 }
 
 
@@ -850,6 +1081,7 @@ emit_call(
 {
     unsigned long count;
     unsigned long index;
+    int needs_alignment;
 
     ast *function;
 
@@ -927,22 +1159,160 @@ emit_call(
     }
 
 
-    /*
-     * The stack is now back at the depth it had before
-     * argument evaluation.
-     *
-     * The current function frame is already aligned to 16 bytes,
-     * so no additional padding is required here.
-     */
+    needs_alignment = context->stack_depth % 16 != 0;
+
     if (
         function &&
         function->type == AST_IDENTIFIER
     ){
+        if (needs_alignment) {
+            codegen_output_write(
+                context->output,
+                "    sub rsp, 8\n"
+            );
+        }
+
         codegen_output_printf(
             context->output,
             "    call %s\n",
             function->identifier.name
         );
+
+        if (needs_alignment) {
+            codegen_output_write(
+                context->output,
+                "    add rsp, 8\n"
+            );
+        }
+    }
+}
+
+static int
+expression_constant_value(
+    ast *expression,
+    uint64_t *value
+)
+{
+    uint64_t left;
+    uint64_t right;
+    char *end;
+    long long integer;
+
+    if (!expression || !value) {
+        return 0;
+    }
+
+    switch (expression->type) {
+        case AST_INTEGER:
+            errno = 0;
+            integer = strtoll(expression->integer.value, &end, 10);
+            if (errno != 0 || *end != '\0') {
+                return 0;
+            }
+            *value = (uint64_t)integer;
+            return 1;
+
+        case AST_UNARY:
+            if (!expression_constant_value(
+                    expression->unary.operand,
+                    &left
+                )) {
+                return 0;
+            }
+
+            switch (expression->unary.operator) {
+                case AST_UNARY_PLUS:
+                    *value = left;
+                    return 1;
+                case AST_UNARY_MINUS:
+                    *value = UINT64_C(0) - left;
+                    return 1;
+                case AST_UNARY_NOT:
+                    *value = left == 0;
+                    return 1;
+                default:
+                    return 0;
+            }
+
+        case AST_BINARY:
+            if (!expression_constant_value(
+                    expression->binary.left,
+                    &left
+                )) {
+                return 0;
+            }
+
+            if (expression->binary.operator == AST_BINARY_AND && left == 0) {
+                *value = 0;
+                return 1;
+            }
+            if (expression->binary.operator == AST_BINARY_OR && left != 0) {
+                *value = 1;
+                return 1;
+            }
+
+            if (!expression_constant_value(
+                    expression->binary.right,
+                    &right
+                )) {
+                return 0;
+            }
+
+            switch (expression->binary.operator) {
+                case AST_BINARY_ADD:
+                    *value = left + right;
+                    return 1;
+                case AST_BINARY_SUBTRACT:
+                    *value = left - right;
+                    return 1;
+                case AST_BINARY_MULTIPLY:
+                    *value = left * right;
+                    return 1;
+                case AST_BINARY_DIVIDE:
+                    if (right == 0 ||
+                        ((int64_t)left == INT64_MIN &&
+                         (int64_t)right == -1)) {
+                        return 0;
+                    }
+                    *value = (uint64_t)((int64_t)left / (int64_t)right);
+                    return 1;
+                case AST_BINARY_MODULO:
+                    if (right == 0 ||
+                        ((int64_t)left == INT64_MIN &&
+                         (int64_t)right == -1)) {
+                        return 0;
+                    }
+                    *value = (uint64_t)((int64_t)left % (int64_t)right);
+                    return 1;
+                case AST_BINARY_EQUAL:
+                    *value = left == right;
+                    return 1;
+                case AST_BINARY_NOT_EQUAL:
+                    *value = left != right;
+                    return 1;
+                case AST_BINARY_LESS:
+                    *value = (int64_t)left < (int64_t)right;
+                    return 1;
+                case AST_BINARY_LESS_EQUAL:
+                    *value = (int64_t)left <= (int64_t)right;
+                    return 1;
+                case AST_BINARY_GREATER:
+                    *value = (int64_t)left > (int64_t)right;
+                    return 1;
+                case AST_BINARY_GREATER_EQUAL:
+                    *value = (int64_t)left >= (int64_t)right;
+                    return 1;
+                case AST_BINARY_AND:
+                    *value = right != 0;
+                    return 1;
+                case AST_BINARY_OR:
+                    *value = right != 0;
+                    return 1;
+            }
+            return 0;
+
+        default:
+            return 0;
     }
 }
 
@@ -1069,12 +1439,16 @@ codegen_x86_64_lvalue_address(
             context->stack_depth -= 8;
 
 
-            /*
-             * The exact element size belongs to semantic/type
-             * information. Use eight-byte elements until that
-             * information is available here.
-             */
             element_size = 8;
+            if (expression_pointee_size(
+                    context,
+                    expression->index.object
+                ) != 0) {
+                element_size = expression_pointee_size(
+                    context,
+                    expression->index.object
+                );
+            }
 
 
             codegen_output_printf(
@@ -1093,6 +1467,10 @@ codegen_x86_64_lvalue_address(
 
 
         case AST_MEMBER:
+        {
+            const char *type;
+            unsigned long pointer_depth;
+            unsigned long offset;
 
             /*
              * Calculate the address of the containing object.
@@ -1103,14 +1481,36 @@ codegen_x86_64_lvalue_address(
             );
 
 
-            /*
-             * The field offset must come from semantic struct
-             * layout information.
-             */
+            if (
+                codegen_x86_64_expression_type(
+                    context,
+                    expression->member.object,
+                    &type,
+                    &pointer_depth
+                ) &&
+                pointer_depth == 0 &&
+                codegen_x86_64_struct_field_offset(
+                    context,
+                    type,
+                    expression->member.name,
+                    &offset
+                ) == 0 &&
+                offset != 0
+            ) {
+                codegen_output_printf(
+                    context->output,
+                    "    add rax, %lu\n",
+                    offset
+                );
+            }
             return;
-
+        }
 
         case AST_POINTER_MEMBER:
+        {
+            const char *type;
+            unsigned long pointer_depth;
+            unsigned long offset;
 
             /*
              * The object expression evaluates to the structure
@@ -1122,11 +1522,30 @@ codegen_x86_64_lvalue_address(
             );
 
 
-            /*
-             * The field offset must come from semantic struct
-             * layout information.
-             */
+            if (
+                codegen_x86_64_expression_type(
+                    context,
+                    expression->pointer_member.object,
+                    &type,
+                    &pointer_depth
+                ) &&
+                pointer_depth != 0 &&
+                codegen_x86_64_struct_field_offset(
+                    context,
+                    type,
+                    expression->pointer_member.name,
+                    &offset
+                ) == 0 &&
+                offset != 0
+            ) {
+                codegen_output_printf(
+                    context->output,
+                    "    add rax, %lu\n",
+                    offset
+                );
+            }
             return;
+        }
 
 
         default:
@@ -1147,6 +1566,8 @@ codegen_x86_64_expression(
     ast *expression
 )
 {
+    uint64_t constant;
+
     if (
         !context ||
         !expression
@@ -1154,6 +1575,18 @@ codegen_x86_64_expression(
         return;
     }
 
+    if (
+        context->optimize &&
+        expression->type != AST_INTEGER &&
+        expression_constant_value(expression, &constant)
+    ) {
+        codegen_output_printf(
+            context->output,
+            "    mov rax, %" PRIu64 "\n",
+            constant
+        );
+        return;
+    }
 
     switch (expression->type){
 
@@ -1244,24 +1677,26 @@ codegen_x86_64_expression(
 
         case AST_MEMBER:
         case AST_POINTER_MEMBER:
+        {
+            const char *type;
+            unsigned long pointer_depth;
 
             codegen_x86_64_lvalue_address(
                 context,
                 expression
             );
 
-
-            /*
-             * Exact member type information will come from
-             * semantic analysis.
-             */
-            emit_load_from_rax(
-                context,
-                "u64",
-                0
-            );
+            if (codegen_x86_64_expression_type(
+                    context,
+                    expression,
+                    &type,
+                    &pointer_depth
+                )) {
+                emit_load_from_rax(context, type, pointer_depth);
+            }
 
             return;
+        }
 
 
         default:
@@ -1273,4 +1708,3 @@ codegen_x86_64_expression(
             return;
     }
 }
-

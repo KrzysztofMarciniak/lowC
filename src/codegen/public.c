@@ -139,11 +139,16 @@ codegen_generate_node(
                 &x86_context,
                 &context->output
             );
+            x86_context.optimize = context->optimize;
+            x86_context.label_count = context->label_counter;
+            x86_context.structs = context->structs;
+            x86_context.functions = context->functions;
 
             codegen_x86_64_function(
                 &x86_context,
                 node
             );
+            context->label_counter = x86_context.label_count;
 
             codegen_x86_64_context_free(
                 &x86_context
@@ -171,14 +176,84 @@ codegen_generate_program(
     ast *tree
 )
 {
+    ast *entrypoint = NULL;
+
     if (!context || !tree){
         return 1;
     }
 
-    return codegen_generate_node(
-        context,
-        tree
+    if (tree->type == AST_PROGRAM) {
+        context->structs = &tree->program.structs;
+        context->functions = &tree->program.functions;
+    }
+
+    if (codegen_generate_node(context, tree)) {
+        return 1;
+    }
+
+    if (!context->executable) {
+        return 0;
+    }
+
+    if (tree->type != AST_PROGRAM) {
+        codegen_fail(context, "executable output requires a program");
+        return 1;
+    }
+
+    for (unsigned long i = 0; i < tree->program.functions.count; i++) {
+        ast *function = tree->program.functions.values[i];
+
+        if (strcmp(function->function.name, "entrypoint") == 0) {
+            if (entrypoint != NULL) {
+                codegen_fail(context, "program must define exactly one entrypoint");
+                return 1;
+            }
+            entrypoint = function;
+        }
+
+        if (strcmp(function->function.name, "main") == 0) {
+            codegen_fail(context, "lowC programs use entrypoint, not main");
+            return 1;
+        }
+    }
+
+    if (entrypoint == NULL) {
+        codegen_fail(context, "program must define an entrypoint function");
+        return 1;
+    }
+
+    if (entrypoint->function.parameters.count != 0) {
+        codegen_fail(context, "entrypoint must not take parameters");
+        return 1;
+    }
+
+    if (
+        strcmp(entrypoint->function.return_type, "void") != 0 ||
+        entrypoint->function.return_pointer_depth != 0
+    ) {
+        codegen_fail(context, "entrypoint must return void");
+        return 1;
+    }
+
+    codegen_output_write(
+        &context->output,
+        ".globl main\n"
+        ".type main, @function\n"
+        "main:\n"
+        "    sub rsp, 8\n"
+        "    call entrypoint\n"
+        "    add rsp, 8\n"
     );
+
+    codegen_output_write(&context->output, "    xor eax, eax\n");
+
+    codegen_output_write(
+        &context->output,
+        "    ret\n"
+        ".size main, .-main\n"
+    );
+
+    return 0;
 }
 
 
@@ -234,6 +309,8 @@ codegen(
     }
 
     context.result = &result;
+    context.optimize = options->optimize;
+    context.executable = options->executable && !options->asm_output;
 
     /*
      * Generic codegen owns the assembly buffer.

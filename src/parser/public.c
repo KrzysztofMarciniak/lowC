@@ -10,7 +10,10 @@ parser(
 {
     parser_result result;
     parser_state state;
+    token_stream combined;
     token *current;
+    unsigned long combined_count;
+    unsigned long combined_position;
 
     result.error = 0;
     result.error_text = NULL;
@@ -24,6 +27,8 @@ parser(
     state.count = 0;
     state.error_text = NULL;
     state.error_token = NULL;
+    combined.values = NULL;
+    combined.count = 0;
 
     /*
      * The lexer must succeed before the parser
@@ -57,13 +62,57 @@ parser(
         return result;
     }
 
-    state.stream =
-        &lexer.streams[0];
+    combined_count = 1;
+    for (unsigned long stream_index = 0;
+         stream_index < lexer.count;
+         stream_index++)
+    {
+        if (lexer.streams[stream_index].count == 0) {
+            result.error = 1;
+            result.error_text = parser_copy_string(
+                "empty token stream was provided."
+            );
+            return result;
+        }
+        combined_count += lexer.streams[stream_index].count - 1;
+    }
+
+    combined.values = calloc(combined_count, sizeof(token));
+    if (!combined.values) {
+        result.error = 1;
+        result.error_text = parser_copy_string(
+            "failed to allocate combined token stream."
+        );
+        return result;
+    }
+
+    combined_position = 0;
+    for (unsigned long stream_index = 0;
+         stream_index < lexer.count;
+         stream_index++)
+    {
+        token_stream *stream = &lexer.streams[stream_index];
+
+        for (unsigned long token_index = 0;
+             token_index + 1 < stream->count;
+             token_index++)
+        {
+            combined.values[combined_position++] =
+                stream->values[token_index];
+        }
+    }
+
+    combined.values[combined_position++] =
+        lexer.streams[lexer.count - 1].values[
+            lexer.streams[lexer.count - 1].count - 1
+        ];
+    combined.count = combined_position;
+
+    state.stream = &combined;
 
     state.position = 0;
 
-    state.count =
-        state.stream->count;
+    state.count = combined.count;
 
     /*
      * Parse the complete program.
@@ -123,11 +172,13 @@ parser(
         }
 
         free(state.error_text);
+        free(combined.values);
 
         return result;
     }
 
     free(state.error_text);
+    free(combined.values);
 
     return result;
 }

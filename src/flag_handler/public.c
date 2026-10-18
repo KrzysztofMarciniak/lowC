@@ -2,6 +2,7 @@
 #include "internal.h"
 
 #include <stdio.h>
+#include <string.h>
 
 static flag_handler_result
 flag_handler_error(
@@ -26,6 +27,9 @@ flag_handler(
         .asm_output = 0,
         .tokens = 0,
         .version = 0,
+        .optimize = 0,
+        .executable = 1,
+        .output_path = NULL,
     };
 
     if (!flags) {
@@ -48,11 +52,28 @@ flag_handler(
 
         if (flag_handler_is_asm(flag)) {
             options.asm_output = 1;
+            options.executable = 0;
             continue;
         }
 
         if (flag_handler_is_tokens(flag)) {
             options.tokens = 1;
+            continue;
+        }
+
+        if (flag_handler_is_optimize(flag)) {
+            options.optimize = 1;
+            continue;
+        }
+
+        if (strcmp(flag, "-o") == 0) {
+            if (index + 1 >= flags->count) {
+                return flag_handler_error(
+                    "missing output path after -o"
+                );
+            }
+
+            options.output_path = flags->values[++index];
             continue;
         }
 
@@ -130,7 +151,9 @@ flag_handler_print_help(
         "Output:\n"
         "  --tokens            Print lexer tokens.\n"
         "  --ast               Print the parsed abstract syntax tree.\n"
-        "  --asm               Generate assembly output.\n"
+        "  --asm               Print assembly output instead of building an executable.\n"
+        "  -o <path>           Write the executable to <path> (default: a.out).\n"
+        "  -O1                 Enable lightweight assembly optimizations.\n"
         "\n"
         "Target:\n"
         "  --target=x86_64     Compile for x86-64.\n"
@@ -140,8 +163,10 @@ flag_handler_print_help(
         "  %s --tokens program.lowc\n"
         "  %s --ast program.lowc\n"
         "  %s --asm program.lowc\n"
+        "  %s -O1 -o program program.lowc\n"
         "  %s --target=x86_64 program.lowc\n"
         "\n",
+        program,
         program,
         program,
         program,

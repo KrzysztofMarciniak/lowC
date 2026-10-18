@@ -43,6 +43,14 @@ flag_handler_is_version(
 }
 
 int
+flag_handler_is_optimize(
+    const char *flag
+)
+{
+    return strcmp(flag, "-O1") == 0;
+}
+
+int
 flag_handler_is_target(
     const char *flag
 )

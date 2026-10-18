@@ -3,11 +3,11 @@ struct Point {
     s64 y;
 };
 
-s64 main() {
+void entrypoint() {
     struct Point p;
-    Point *ptr;
+    struct Point *ptr;
     ptr = &p;
     ptr->x = 10;
     ptr->y = 20;
-    return ptr->x + ptr->y;
+    return;
 }

@@ -29,6 +29,11 @@ flag_handler_is_version(
 );
 
 int
+flag_handler_is_optimize(
+    const char *flag
+);
+
+int
 flag_handler_is_target(
     const char *flag
 );

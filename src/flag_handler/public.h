@@ -17,6 +17,9 @@ typedef struct flag_handler_options
     int asm_output;
     int tokens;
     int version;
+    int optimize;
+    int executable;
+    const char *output_path;
 } flag_handler_options;
 
 typedef struct flag_handler_result

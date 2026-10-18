@@ -14,6 +14,10 @@ typedef struct codegen_context
     const codegen_target *target;
 
     unsigned long label_counter;
+    int optimize;
+    int executable;
+    ast_list *structs;
+    ast_list *functions;
 
 } codegen_context;
 

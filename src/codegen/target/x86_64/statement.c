@@ -401,6 +401,10 @@ emit_assignment(
 )
 {
     codegen_x86_64_local *local;
+    const char *type;
+    const char *operand_size;
+    const char *register_name;
+    unsigned long pointer_depth;
 
 
     /*
@@ -501,10 +505,34 @@ emit_assignment(
     }
 
 
-    codegen_output_write(
-        context->output,
-        "    mov QWORD PTR [rcx], rax\n"
-    );
+    if (
+        codegen_x86_64_expression_type(
+            context,
+            statement->assignment.left,
+            &type,
+            &pointer_depth
+        )
+    ) {
+        operand_size = codegen_x86_64_type_operand_size(
+            type,
+            pointer_depth
+        );
+        register_name = codegen_x86_64_type_register(
+            type,
+            pointer_depth
+        );
+        if (operand_size && register_name) {
+            codegen_output_printf(
+                context->output,
+                "    mov %s [rcx], %s\n",
+                operand_size,
+                register_name
+            );
+            return;
+        }
+    }
+
+    codegen_output_write(context->output, "    mov QWORD PTR [rcx], rax\n");
 }
 
 
@@ -1250,12 +1278,13 @@ codegen_x86_64_statement(
             }
 
 
-            codegen_output_write(
+            codegen_output_printf(
                 context->output,
                 "\n"
                 "    # return\n"
                 "    # transfer control to function epilogue\n"
-                "    jmp .L_function_epilogue\n"
+                "    jmp .L%lu\n",
+                context->epilogue_label
             );
 
             return;

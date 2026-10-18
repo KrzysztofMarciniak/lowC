@@ -10,6 +10,38 @@ lowC supports functions, structs, pointers, arrays, explicit-width integers, and
 
 The generated assembly prioritizes clarity and explicitness, with detailed commentary rather than aggressive optimization.
 
+## Build and Run
+
+Build the compiler with `make`:
+
+```sh
+make
+```
+
+By default, lowC compiles a source file to an executable named `a.out`:
+
+```sh
+build/lowc program.lowc
+./a.out
+```
+
+Use `-o` to choose the executable path, `-O1` to enable lightweight integer constant folding, or `--asm` to print assembly instead of building an executable:
+
+```sh
+build/lowc -O1 -o program program.lowc
+build/lowc --asm program.lowc
+```
+
+Executable output is assembled and linked with the system C compiler driver (`cc` by default; set `CC` to select another driver). Executable programs must define exactly one `void entrypoint()` with no parameters. The compiler supplies the platform `main` wrapper.
+
+Run the compiler and generated-code checks with:
+
+```sh
+./example/tests/run_tests.sh
+```
+
+The suite parses every example, assembles generated output, and checks executable behavior with both optimized and unoptimized assembly.
+
 ## Motivation
 
 lowC originally began as a subset of C, but has evolved into its own C-like language.
@@ -314,9 +346,8 @@ void entrypoint() {
 }
 ```
 
-Imports work for:
+Imports are resolved relative to the importing file and can be used for:
 
 * Functions
 * Structs
 * Variables
-

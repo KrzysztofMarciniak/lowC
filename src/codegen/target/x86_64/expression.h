@@ -34,4 +34,12 @@ void codegen_x86_64_lvalue_address(
     ast *expression
 );
 
+int
+codegen_x86_64_expression_type(
+    codegen_x86_64_context *context,
+    ast *expression,
+    const char **type,
+    unsigned long *pointer_depth
+);
+
 #endif

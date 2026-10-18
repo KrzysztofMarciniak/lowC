@@ -4,15 +4,16 @@
 # --asm, reporting a PASS/FAIL summary and dumping output only for
 # failures.
 #
-# Usage (from the repo root, ~/lowC):
-#     ./run_tests.sh
-#     ./run_tests.sh --asm            # only test one mode
-#     ./run_tests.sh path/to/lowc     # use a different binary
+# Usage:
+#     ./example/tests/run_tests.sh
+#     ./example/tests/run_tests.sh --asm
+#     ./example/tests/run_tests.sh path/to/lowc
 
 set -uo pipefail
 
-BIN="../../build/lowc"
-DIR="."
+SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+BIN="$SCRIPT_DIR/../../build/lowc"
+DIR="$SCRIPT_DIR"
 MODES=(--tokens --ast --asm)
 
 for arg in "$@"; do
@@ -48,6 +49,15 @@ for f in "$DIR"/*.lowc; do
         out=$("$BIN" "$mode" "$f" 2>&1)
         status=$?
 
+        if [ $status -eq 0 ] && [ "$mode" = "--asm" ]; then
+            assembler_out=$(printf '%s\n' "$out" | cc -x assembler -c -o /dev/null - 2>&1)
+            status=$?
+            if [ $status -ne 0 ]; then
+                out="$out
+$assembler_out"
+            fi
+        fi
+
         if [ $status -ne 0 ]; then
             failed=$((failed + 1))
             echo "FAIL [$mode] $name (exit $status)"
@@ -58,6 +68,15 @@ for f in "$DIR"/*.lowc; do
         fi
     done
 done
+
+if [[ " ${MODES[*]} " == *" --asm "* ]]; then
+    if ! "$SCRIPT_DIR/run_executable_tests.sh" "$BIN"; then
+        failed=$((failed + 1))
+        total=$((total + 1))
+    else
+        total=$((total + 1))
+    fi
+fi
 
 echo
 echo "----------------------------------------"
