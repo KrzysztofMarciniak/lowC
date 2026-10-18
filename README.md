@@ -12,11 +12,16 @@ The generated assembly prioritizes clarity and explicitness, with detailed comme
 
 ## Build and Run
 
-Build the compiler with `make`:
+Build the size-optimized release compiler with `make` or `make release`:
 
 ```sh
 make
 ```
+
+This builds `build/lowc` with size optimization, link-time optimization, dead
+section removal, and stripped symbols. Use `make debug` to build an
+unoptimized debug executable separately at `build/debug/lowc`.
+`make install` always installs the release executable from `build/lowc`.
 
 New to lowC? Run `make quick_start` for a hand-holding introduction to the language, followed by compiling and running a small example. The guide is also available in [`QUICK_START.md`](QUICK_START.md).
 
