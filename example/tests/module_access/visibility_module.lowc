@@ -1,0 +1,20 @@
+#include "visibility_dependency.lowc" : "dependency_value";
+
+struct Exported {
+    s64 value;
+};
+
+struct PrivateType {
+    s64 value;
+};
+
+s64 exported_global = 10;
+s64 private_global = 20;
+
+s64 private_function() {
+    return private_global + dependency_value();
+}
+
+s64 exported_function() {
+    return private_function() + exported_global;
+}

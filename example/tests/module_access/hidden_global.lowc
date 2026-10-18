@@ -1,0 +1,10 @@
+#include "visibility_module.lowc" : "exported_function";
+
+s64 read_private_global() {
+    return private_global;
+}
+
+void entrypoint() {
+    read_private_global();
+    return;
+}

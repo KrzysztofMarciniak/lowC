@@ -46,6 +46,20 @@ semantic_check_statement(
         {
             semantic_symbol *symbol;
 
+            if (
+                !semantic_type_name_is_visible(
+                    context,
+                    statement->file,
+                    statement->variable.type
+                )
+            ) {
+                *error_text = semantic_strdup(
+                    "variable type is not imported"
+                );
+
+                return 1;
+            }
+
 
             type = semantic_type_resolve(
                 statement->variable.type,

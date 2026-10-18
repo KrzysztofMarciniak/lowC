@@ -1,0 +1,6 @@
+#include "visibility_module.lowc" : "exported_function";
+
+void entrypoint() {
+    private_function();
+    return;
+}

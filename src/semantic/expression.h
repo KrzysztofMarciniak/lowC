@@ -8,6 +8,7 @@
 typedef struct semantic_context
 {
     semantic_scope *scope;
+    ast_list *imports;
 
     semantic_function **functions;
     unsigned long function_count;
@@ -25,7 +26,23 @@ typedef struct semantic_context
      * scratch.
      */
     semantic_function *current_function;
+    const char *current_file;
 } semantic_context;
+
+int
+semantic_declaration_is_visible(
+    semantic_context *context,
+    const char *requester_file,
+    const char *name,
+    ast *declaration
+);
+
+int
+semantic_type_name_is_visible(
+    semantic_context *context,
+    const char *requester_file,
+    const char *name
+);
 
 semantic_type *
 semantic_check_expression(

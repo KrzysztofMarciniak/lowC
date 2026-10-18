@@ -16,7 +16,14 @@ cleanup() {
         "$TEMP_DIR/harness" \
         "$TEMP_DIR/harness-unoptimized" \
         "$TEMP_DIR/modules.s" \
-        "$TEMP_DIR/modules-harness"
+        "$TEMP_DIR/modules-harness" \
+        "$TEMP_DIR/visibility-program" \
+        "$TEMP_DIR/visibility.s" \
+        "$TEMP_DIR/visibility-harness" \
+        "$TEMP_DIR/hidden-function.out" \
+        "$TEMP_DIR/hidden-global.out" \
+        "$TEMP_DIR/hidden-struct.out" \
+        "$TEMP_DIR/hidden-dependency.out"
     rmdir "$TEMP_DIR"
 }
 trap cleanup EXIT
@@ -76,6 +83,48 @@ then
     exit 1
 fi
 
+MODULE_ACCESS_DIR="$SCRIPT_DIR/module_access"
+
+if ! "$BIN" --asm "$MODULE_ACCESS_DIR/visibility_main.lowc" \
+    >"$TEMP_DIR/visibility.s"
+then
+    echo "FAIL [modules] selected declarations were not visible"
+    exit 1
+fi
+
+if ! cc -x assembler "$TEMP_DIR/visibility.s" -x c \
+    "$MODULE_ACCESS_DIR/harness.c" -o "$TEMP_DIR/visibility-harness" ||
+   ! "$TEMP_DIR/visibility-harness"
+then
+    echo "FAIL [modules] selected declarations or private helpers returned incorrect results"
+    exit 1
+fi
+
+if ! "$BIN" "$MODULE_ACCESS_DIR/visibility_main.lowc" \
+    -o "$TEMP_DIR/visibility-program" ||
+   ! "$TEMP_DIR/visibility-program"
+then
+    echo "FAIL [modules] visibility example did not build and run"
+    exit 1
+fi
+
+for hidden_case in function global struct dependency; do
+    if "$BIN" --asm "$MODULE_ACCESS_DIR/hidden_${hidden_case}.lowc" \
+        >"$TEMP_DIR/hidden-${hidden_case}.out" 2>&1
+    then
+        echo "FAIL [modules] unimported ${hidden_case} was accessible"
+        exit 1
+    fi
+
+    if ! grep -q "is not imported" \
+        "$TEMP_DIR/hidden-${hidden_case}.out"
+    then
+        echo "FAIL [modules] ${hidden_case} visibility failed for an unrelated reason"
+        cat "$TEMP_DIR/hidden-${hidden_case}.out"
+        exit 1
+    fi
+done
+
 "$BIN" --asm "$SCRIPT_DIR/23_runtime.lowc" >"$TEMP_DIR/unoptimized.s" || exit 1
 "$BIN" --asm -O1 "$SCRIPT_DIR/23_runtime.lowc" >"$TEMP_DIR/optimized.s" || exit 1
 
@@ -112,4 +161,5 @@ if ! "$TEMP_DIR/harness-unoptimized"; then
 fi
 
 echo "ok   [modules] imported functions, structs, and globals assemble, link, and run"
+echo "ok   [modules] unimported functions, structs, and globals are rejected"
 echo "ok   [executable] optimized and unoptimized output assembles, links, and runs"

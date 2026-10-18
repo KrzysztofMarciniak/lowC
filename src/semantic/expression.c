@@ -27,6 +27,139 @@ semantic_strdup(
     return copy;
 }
 
+static int
+semantic_import_targets_file(
+    ast *import,
+    const char *declaration_file
+)
+{
+    const char *path;
+    const char *slash;
+    size_t directory_length;
+    size_t path_length;
+    size_t declaration_length;
+
+    if (
+        !import ||
+        import->type != AST_IMPORT ||
+        !import->import.path ||
+        !import->file ||
+        !declaration_file
+    ) {
+        return 0;
+    }
+
+    path = import->import.path;
+    if (path[0] == '/') {
+        return strcmp(path, declaration_file) == 0;
+    }
+
+    slash = strrchr(import->file, '/');
+    if (!slash) {
+        return strcmp(path, declaration_file) == 0;
+    }
+
+    directory_length = (size_t)(slash - import->file + 1);
+    path_length = strlen(path);
+    declaration_length = strlen(declaration_file);
+
+    return declaration_length == directory_length + path_length &&
+        memcmp(declaration_file, import->file, directory_length) == 0 &&
+        memcmp(
+            declaration_file + directory_length,
+            path,
+            path_length
+        ) == 0;
+}
+
+int
+semantic_declaration_is_visible(
+    semantic_context *context,
+    const char *requester_file,
+    const char *name,
+    ast *declaration
+)
+{
+    unsigned long import_index;
+
+    if (!context || !name || !declaration) {
+        return 0;
+    }
+
+    if (
+        (!requester_file && !declaration->file) ||
+        (requester_file && declaration->file &&
+         strcmp(requester_file, declaration->file) == 0)
+    ) {
+        return 1;
+    }
+
+    if (!requester_file || !context->imports) {
+        return 0;
+    }
+
+    for (
+        import_index = 0;
+        import_index < context->imports->count;
+        import_index++
+    ) {
+        ast *import = context->imports->values[import_index];
+        unsigned long name_index;
+
+        if (
+            !import->file ||
+            strcmp(import->file, requester_file) != 0 ||
+            !semantic_import_targets_file(import, declaration->file)
+        ) {
+            continue;
+        }
+
+        for (
+            name_index = 0;
+            name_index < import->import.names.count;
+            name_index++
+        ) {
+            ast *imported_name = import->import.names.values[name_index];
+
+            if (
+                imported_name->type == AST_IDENTIFIER &&
+                strcmp(imported_name->identifier.name, name) == 0
+            ) {
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
+int
+semantic_type_name_is_visible(
+    semantic_context *context,
+    const char *requester_file,
+    const char *name
+)
+{
+    semantic_struct *structure;
+
+    structure = semantic_struct_find(
+        context->structs,
+        context->struct_count,
+        name
+    );
+
+    if (!structure) {
+        return 1;
+    }
+
+    return semantic_declaration_is_visible(
+        context,
+        requester_file,
+        name,
+        structure->declaration
+    );
+}
+
 
 /*
  * Return non-zero when the type is one of lowC's builtin
@@ -751,6 +884,21 @@ semantic_check_call(
         return NULL;
     }
 
+    if (
+        !semantic_declaration_is_visible(
+            context,
+            context->current_file,
+            signature->name,
+            signature->declaration
+        )
+    ) {
+        *error_text = semantic_strdup(
+            "function is not imported"
+        );
+
+        return NULL;
+    }
+
 
     if (
         expression->call.arguments.count !=
@@ -923,6 +1071,21 @@ semantic_check_expression(
             {
                 *error_text = semantic_strdup(
                     "use of undeclared identifier"
+                );
+
+                return NULL;
+            }
+
+            if (
+                !semantic_declaration_is_visible(
+                    context,
+                    context->current_file,
+                    expression->identifier.name,
+                    symbol->declaration
+                )
+            ) {
+                *error_text = semantic_strdup(
+                    "identifier is not imported"
                 );
 
                 return NULL;

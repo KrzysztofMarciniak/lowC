@@ -1,0 +1,12 @@
+#include "visibility_module.lowc" : "Exported", "exported_global", "exported_function";
+
+s64 visibility_value() {
+    struct Exported item;
+    item.value = exported_function() + exported_global;
+    return item.value;
+}
+
+void entrypoint() {
+    visibility_value();
+    return;
+}

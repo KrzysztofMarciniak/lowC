@@ -366,3 +366,7 @@ Imports are resolved relative to the importing file and can be used for:
 * Functions
 * Structs
 * Variables
+
+Only the names listed by an import are visible to that source file. Declarations
+in a module remain available within that module, but imports are not re-exported;
+import a dependency directly to use its names from another file.

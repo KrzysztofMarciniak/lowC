@@ -49,16 +49,20 @@ semantic_check_function(
 {
     semantic_scope *previous_scope;
     semantic_function *previous_function;
+    const char *previous_file;
     unsigned long i;
 
     previous_scope = context->scope;
     previous_function = context->current_function;
+    previous_file = context->current_file;
+    context->current_file = function->file;
 
     context->scope = semantic_scope_create(previous_scope);
 
     if (context->scope == NULL)
     {
         context->scope = previous_scope;
+        context->current_file = previous_file;
 
         *error_text = semantic_strdup(
             "failed to create function scope"
@@ -151,6 +155,7 @@ semantic_check_function(
 
     context->scope = previous_scope;
     context->current_function = previous_function;
+    context->current_file = previous_file;
 
     return 0;
 
@@ -159,6 +164,7 @@ fail:
 
     context->scope = previous_scope;
     context->current_function = previous_function;
+    context->current_file = previous_file;
 
     return 1;
 }
@@ -189,6 +195,7 @@ semantic(
     }
 
     context.scope = semantic_scope_create(NULL);
+    context.imports = &parser.tree->program.imports;
 
     if (context.scope == NULL)
     {
@@ -248,6 +255,34 @@ semantic(
         context.struct_count++;
     }
 
+    for (i = 0; i < parser.tree->program.structs.count; i++)
+    {
+        ast *declaration =
+            parser.tree->program.structs.values[i];
+
+        for (
+            unsigned long field_index = 0;
+            field_index < declaration->structure.fields.count;
+            field_index++
+        ) {
+            ast *field = declaration->structure.fields.values[field_index];
+
+            if (
+                !semantic_type_name_is_visible(
+                    &context,
+                    field->file,
+                    field->struct_field.type
+                )
+            ) {
+                result = semantic_error(
+                    field,
+                    "struct field type is not imported"
+                );
+                goto cleanup;
+            }
+        }
+    }
+
     /*
      * Pass 2: register every function's signature before checking
      * any body, so calls to functions declared later in the file
@@ -275,6 +310,45 @@ semantic(
             );
 
             goto cleanup;
+        }
+
+        if (
+            !semantic_type_name_is_visible(
+                &context,
+                function->file,
+                function->function.return_type
+            )
+        ) {
+            semantic_function_free(signature);
+            result = semantic_error(
+                function,
+                "function return type is not imported"
+            );
+            goto cleanup;
+        }
+
+        for (
+            unsigned long parameter_index = 0;
+            parameter_index < function->function.parameters.count;
+            parameter_index++
+        ) {
+            ast *parameter =
+                function->function.parameters.values[parameter_index];
+
+            if (
+                !semantic_type_name_is_visible(
+                    &context,
+                    parameter->file,
+                    parameter->parameter.type
+                )
+            ) {
+                semantic_function_free(signature);
+                result = semantic_error(
+                    parameter,
+                    "function parameter type is not imported"
+                );
+                goto cleanup;
+            }
         }
 
         functions = realloc(
@@ -310,6 +384,20 @@ semantic(
         semantic_symbol *symbol;
 
         node = parser.tree->program.globals.values[i];
+
+        if (
+            !semantic_type_name_is_visible(
+                &context,
+                node->file,
+                node->variable.type
+            )
+        ) {
+            result = semantic_error(
+                node,
+                "global variable type is not imported"
+            );
+            goto cleanup;
+        }
 
         type = semantic_type_resolve(
             node->variable.type,
@@ -392,6 +480,8 @@ semantic(
         if (node->variable.value == NULL)
             continue;
 
+        context.current_file = node->file;
+
         symbol = semantic_scope_find_local(
             context.scope,
             node->variable.name
@@ -413,12 +503,14 @@ semantic(
             result.line = node->line;
             result.column = node->column;
 
+            context.current_file = NULL;
             goto cleanup;
         }
 
         if (!semantic_type_assignable(symbol->type, value))
         {
             semantic_type_free(value);
+            context.current_file = NULL;
 
             result = semantic_error(
                 node,
@@ -429,6 +521,7 @@ semantic(
         }
 
         semantic_type_free(value);
+        context.current_file = NULL;
     }
 
     /*
