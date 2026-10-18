@@ -18,6 +18,19 @@ Build the compiler with `make`:
 make
 ```
 
+Install the compiler as `/usr/local/bin/lowc` (use `sudo` if needed), or choose a different prefix:
+
+```sh
+sudo make install
+make install PREFIX="$HOME/.local"
+```
+
+`DESTDIR` can stage an install without changing the configured prefix:
+
+```sh
+make install DESTDIR=/tmp/lowc-stage PREFIX=/usr
+```
+
 By default, lowC compiles a source file to an executable named `a.out`:
 
 ```sh
