@@ -1,0 +1,4 @@
+struct Point {
+    s64 x;
+    s64 y;
+};

@@ -1,0 +1,50 @@
+#include "point.lowc" : "Point";
+#include "route.lowc" : "route_bonus", "distance_reward";
+
+s64 final_score = 0;
+
+s64 point_value(s64 x, s64 y) {
+    return x * 2 + y;
+}
+
+s64 calculate_score() {
+    struct Point stops[3];
+    stops[0].x = 2;
+    stops[0].y = 1;
+    stops[1].x = 3;
+    stops[1].y = 2;
+    stops[2].x = 1;
+    stops[2].y = 4;
+
+    s64 distances[3];
+    distances[0] = 4;
+    distances[1] = 12;
+    distances[2] = 8;
+
+    struct Point *stop;
+    s64 *distance;
+    distance = &distances[0];
+
+    s64 total = 0;
+    for (s64 i = 0; i < 3; i = i + 1) {
+        stop = &stops[i];
+        total = total + point_value(stop->x, stop->y);
+        total = total + distance_reward(*(distance + i));
+    }
+
+    u8 energy = 3;
+    if (total >= 20 && energy > 0) {
+        return total + route_bonus;
+    } else {
+        return total;
+    }
+}
+
+void entrypoint() {
+    final_score = calculate_score();
+    return;
+}
+
+s64 read_score() {
+    return final_score;
+}

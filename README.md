@@ -20,6 +20,19 @@ make
 
 New to lowC? Run `make quick_start` for a hand-holding introduction to the language, followed by compiling and running a small example. The guide is also available in [`QUICK_START.md`](QUICK_START.md).
 
+Run `make example` to build and play through a small multi-file trail challenge.
+It exercises imported modules, structs, arrays, pointers and pointer arithmetic,
+globals, functions, loops, and conditionals:
+
+```console
+$ make example
+Trail challenge complete! Score: 42 (expected 42)
+```
+
+The lowC source is split across `example/trail/point.lowc`,
+`example/trail/route.lowc`, and `example/trail/main.lowc`. A small C harness
+prints and checks the score because lowC does not have built-in I/O yet.
+
 Install the compiler as `/usr/local/bin/lowc` (use `sudo` if needed), or choose a different prefix:
 
 ```sh

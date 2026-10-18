@@ -1,0 +1,9 @@
+s64 route_bonus = 16;
+
+s64 distance_reward(s64 distance) {
+    if (distance <= 10) {
+        return 3;
+    } else {
+        return 1;
+    }
+}
