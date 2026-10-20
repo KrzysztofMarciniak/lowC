@@ -1,5 +1,79 @@
-#include "../internal/print/main.lowc" : "__lowc_strlen";
+#include "../internal/string/main.lowc" : "__lowc_strlen";
+#include "memory.lowc" : "alloc";
 
 u64 strlen(u8 *data) {
     return __lowc_strlen(data);
+}
+
+s64 strcmp(u8 *left, u8 *right) {
+    u64 index;
+
+    for (
+        index = 0;
+        left[index] == right[index] && left[index] != 0;
+        index = index + 1
+    ) {
+    }
+
+    if (left[index] < right[index]) {
+        return -1;
+    }
+
+    if (left[index] > right[index]) {
+        return 1;
+    }
+
+    return 0;
+}
+
+u8 *strcpy(u8 *destination, u8 *source) {
+    u8 *result;
+    u64 index;
+
+    result = destination;
+
+    for (index = 0; source[index] != 0; index = index + 1) {
+        destination[index] = source[index];
+    }
+
+    destination[index] = 0;
+    return result;
+}
+
+u8 *strcat(u8 *destination, u8 *source) {
+    u8 *result;
+    u64 destination_length;
+    u64 source_index;
+
+    result = destination;
+
+    for (
+        destination_length = 0;
+        destination[destination_length] != 0;
+        destination_length = destination_length + 1
+    ) {
+    }
+
+    for (source_index = 0; source[source_index] != 0; source_index = source_index + 1) {
+        destination[destination_length + source_index] =
+            source[source_index];
+    }
+
+    destination[destination_length + source_index] = 0;
+    return result;
+}
+
+u8 *strdup(u8 *source) {
+    u8 *result;
+    u64 length;
+    u64 index;
+
+    length = strlen(source);
+    result = alloc(length + 1);
+
+    for (index = 0; index <= length; index = index + 1) {
+        result[index] = source[index];
+    }
+
+    return result;
 }

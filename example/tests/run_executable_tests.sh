@@ -204,7 +204,201 @@ then
     exit 1
 fi
 
+cat >"$TEMP_DIR/standard-library-data.lowc" <<EOF
+#include "$TEMP_DIR/usr/local/share/lowc/public/string.lowc" :
+    "strlen", "strcmp", "strcpy", "strcat", "strdup";
+#include "$TEMP_DIR/usr/local/share/lowc/public/memory.lowc" :
+    "alloc", "dealloc";
+#include "$TEMP_DIR/usr/local/share/lowc/public/hashmap.lowc" :
+    "HashMap", "hashmap_init", "hashmap_set", "hashmap_get",
+    "hashmap_remove", "hashmap_deinit";
+
+u64 standard_library_data_test() {
+    u8 *buffer;
+    u8 *copy;
+    struct HashMap map;
+    u64 value;
+    u64 high_key;
+    u64 index;
+
+    buffer = alloc(32);
+    strcpy(buffer, "low");
+    strcat(buffer, "C");
+    if (strcmp(buffer, "lowC") != 0 || strlen(buffer) != 4) {
+        return 1;
+    }
+
+    copy = strdup(buffer);
+    if (strcmp(copy, "lowC") != 0 || dealloc(copy) == 0) {
+        return 2;
+    }
+
+    hashmap_init(&map, 8);
+    for (index = 0; index < 12; index = index + 1) {
+        hashmap_set(&map, index, index * 7);
+    }
+
+    asm("mov %0, 0x8000000000000000" : "=rax"(high_key) : :);
+    hashmap_set(&map, high_key, 99);
+    if (hashmap_get(&map, high_key, &value) == 0 || value != 99) {
+        return 3;
+    }
+
+    if (hashmap_get(&map, 8, &value) == 0 || value != 56) {
+        return 4;
+    }
+
+    if (hashmap_remove(&map, 8) == 0 || hashmap_get(&map, 8, &value) != 0) {
+        return 5;
+    }
+
+    hashmap_set(&map, 24, 168);
+    if (hashmap_get(&map, 24, &value) == 0 || value != 168) {
+        return 6;
+    }
+
+    if (hashmap_get(&map, 9, &value) == 0 || value != 63) {
+        return 7;
+    }
+
+    if (hashmap_deinit(&map) == 0 || dealloc(buffer) == 0) {
+        return 8;
+    }
+
+    return 0;
+}
+EOF
+
+cat >"$TEMP_DIR/standard-library-data-harness.c" <<'EOF'
+unsigned long standard_library_data_test(void);
+
+int
+main(void)
+{
+    return standard_library_data_test() == 0 ? 0 : 1;
+}
+EOF
+
+for mode in unoptimized optimized; do
+    if [ "$mode" = optimized ]; then
+        optimization=-O1
+    else
+        optimization=
+    fi
+
+    if ! "$BIN" --asm $optimization "$TEMP_DIR/standard-library-data.lowc" \
+        >"$TEMP_DIR/standard-library-data-$mode.s" ||
+       ! cc -x assembler "$TEMP_DIR/standard-library-data-$mode.s" -x c \
+            "$TEMP_DIR/standard-library-data-harness.c" \
+            -o "$TEMP_DIR/standard-library-data-$mode" ||
+       ! "$TEMP_DIR/standard-library-data-$mode"
+    then
+        echo "FAIL [standard library] $mode strings, heap, or hashmap behavior was incorrect"
+        exit 1
+    fi
+done
+
+if ! "$BIN" --asm "$SCRIPT_DIR/26_inline_asm.lowc" \
+    >"$TEMP_DIR/inline-asm.s"
+then
+    echo "FAIL [inline assembly] valid assembly did not compile"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/inline-asm-harness.c" <<'EOF'
+unsigned long inline_assembly_move(void);
+unsigned long inline_assembly_syscall_pid(void);
+unsigned long inline_assembly_callee_saved(void);
+unsigned long inline_assembly_call(void);
+
+int
+main(void)
+{
+    return inline_assembly_move() == 42 &&
+           inline_assembly_syscall_pid() > 0 &&
+           inline_assembly_callee_saved() == 17 &&
+           inline_assembly_call() == 23
+        ? 0
+        : 1;
+}
+EOF
+
+if ! cc -x assembler "$TEMP_DIR/inline-asm.s" -x c \
+    "$TEMP_DIR/inline-asm-harness.c" -o "$TEMP_DIR/inline-asm-program" ||
+   ! "$TEMP_DIR/inline-asm-program"
+then
+    echo "FAIL [inline assembly] outputs, syscall, or callee-saved handling failed"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
+u64 invalid_output() {
+    u64 result;
+    asm("nop" : "=rsp"(result) : :);
+    return result;
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/invalid-inline-asm.lowc" \
+    >"$TEMP_DIR/invalid-inline-asm.out" 2>&1 ||
+   ! grep -q "invalid inline assembly output register constraint" \
+        "$TEMP_DIR/invalid-inline-asm.out"
+then
+    echo "FAIL [inline assembly] reserved rsp output was not rejected"
+    cat "$TEMP_DIR/invalid-inline-asm.out"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
+void invalid_output_lvalue() {
+    asm("nop" : "=rax"(42) : :);
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/invalid-inline-asm.lowc" \
+    >"$TEMP_DIR/invalid-inline-asm.out" 2>&1 ||
+   ! grep -q "inline assembly output must be an assignable lvalue" \
+        "$TEMP_DIR/invalid-inline-asm.out"
+then
+    echo "FAIL [inline assembly] non-lvalue output was not rejected"
+    cat "$TEMP_DIR/invalid-inline-asm.out"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
+void invalid_input_register() {
+    asm("nop" : : "foo"(1) :);
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/invalid-inline-asm.lowc" \
+    >"$TEMP_DIR/invalid-inline-asm.out" 2>&1 ||
+   ! grep -q "invalid inline assembly input register constraint" \
+        "$TEMP_DIR/invalid-inline-asm.out"
+then
+    echo "FAIL [inline assembly] unknown input register was not rejected"
+    cat "$TEMP_DIR/invalid-inline-asm.out"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
+void invalid_placeholder() {
+    asm("mov %0, %1" : : :);
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/invalid-inline-asm.lowc" \
+    >"$TEMP_DIR/invalid-inline-asm.out" 2>&1 ||
+   ! grep -q "inline assembly operand placeholder is out of range" \
+        "$TEMP_DIR/invalid-inline-asm.out"
+then
+    echo "FAIL [inline assembly] invalid placeholder was not rejected"
+    cat "$TEMP_DIR/invalid-inline-asm.out"
+    exit 1
+fi
+
 echo "ok   [modules] imported functions, structs, and globals assemble, link, and run"
 echo "ok   [modules] unimported functions, structs, and globals are rejected"
 echo "ok   [executable] optimized and unoptimized output assembles, links, and runs"
 echo "ok   [standard library] installed print module writes exact output"
+echo "ok   [inline assembly] register operands, syscall, clobbers, and validation work"

@@ -1,0 +1,9 @@
+#include "../internal/memory/main.lowc" : "__lowc_alloc", "__lowc_dealloc";
+
+void *alloc(u64 size) {
+    return __lowc_alloc(size);
+}
+
+u1 dealloc(void *data) {
+    return __lowc_dealloc(data);
+}

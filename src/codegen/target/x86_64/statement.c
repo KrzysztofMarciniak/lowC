@@ -5,6 +5,7 @@
 #include "../../output.h"
 
 #include <stdio.h>
+#include <string.h>
 
 
 /*
@@ -533,6 +534,307 @@ emit_assignment(
     }
 
     codegen_output_write(context->output, "    mov QWORD PTR [rcx], rax\n");
+}
+
+static int
+assembly_register_is_callee_saved(
+    const char *register_name
+)
+{
+    return
+        strcmp(register_name, "rbx") == 0 ||
+        strcmp(register_name, "r12") == 0 ||
+        strcmp(register_name, "r13") == 0 ||
+        strcmp(register_name, "r14") == 0 ||
+        strcmp(register_name, "r15") == 0;
+}
+
+static void
+assembly_save_callee_saved_register(
+    codegen_x86_64_context *context,
+    const char *register_name,
+    const char **saved,
+    unsigned long *saved_count
+)
+{
+    if (!assembly_register_is_callee_saved(register_name))
+        return;
+
+    for (unsigned long index = 0; index < *saved_count; index++) {
+        if (strcmp(saved[index], register_name) == 0)
+            return;
+    }
+
+    codegen_output_printf(
+        context->output,
+        "    push %s\n",
+        register_name
+    );
+    context->stack_depth += 8;
+    saved[(*saved_count)++] = register_name;
+}
+
+static const char *
+assembly_output_register(
+    ast *operand
+)
+{
+    return operand->assembly_operand.constraint + 1;
+}
+
+static const char *
+assembly_input_register(
+    ast *operand
+)
+{
+    return operand->assembly_operand.constraint;
+}
+
+static const char *
+assembly_low_register(
+    unsigned long size
+)
+{
+    switch (size) {
+        case 1: return "cl";
+        case 2: return "cx";
+        case 4: return "ecx";
+        default: return "rcx";
+    }
+}
+
+static void
+emit_assembly_template(
+    codegen_x86_64_context *context,
+    ast *assembly
+)
+{
+    const char *text = assembly->assembly.template;
+    unsigned long output_count = assembly->assembly.outputs.count;
+    unsigned long input_count = assembly->assembly.inputs.count;
+    int line_start = 1;
+
+    codegen_output_write(context->output, "\n");
+
+    for (unsigned long index = 0; text[index] != '\0'; index++) {
+        char value = text[index];
+
+        if (value == '\\' && text[index + 1] != '\0') {
+            index++;
+            switch (text[index]) {
+                case 'n': value = '\n'; break;
+                case 'r': value = '\r'; break;
+                case 't': value = '\t'; break;
+                case '\\':
+                case '"': value = text[index]; break;
+                default: value = text[index]; break;
+            }
+        } else if (value == '%') {
+            unsigned long operand_index = 0;
+
+            if (text[index + 1] == '%') {
+                index++;
+            } else {
+                index++;
+                while (text[index] >= '0' && text[index] <= '9') {
+                    operand_index =
+                        operand_index * 10 +
+                        (unsigned long)(text[index] - '0');
+                    index++;
+                }
+                index--;
+
+                if (operand_index < output_count) {
+                    if (line_start)
+                        codegen_output_write(context->output, "    ");
+                    codegen_output_write(
+                        context->output,
+                        assembly_output_register(
+                            assembly->assembly.outputs.values[operand_index]
+                        )
+                    );
+                } else {
+                    operand_index -= output_count;
+                    if (operand_index < input_count) {
+                        if (line_start)
+                            codegen_output_write(context->output, "    ");
+                        codegen_output_write(
+                            context->output,
+                            assembly_input_register(
+                                assembly->assembly.inputs.values[operand_index]
+                            )
+                        );
+                    }
+                }
+                line_start = 0;
+                continue;
+            }
+        }
+
+        if (line_start && value != '\n')
+            codegen_output_write(context->output, "    ");
+
+        codegen_output_write(
+            context->output,
+            (char[2]) { value, '\0' }
+        );
+        line_start = value == '\n';
+    }
+
+    if (!line_start)
+        codegen_output_write(context->output, "\n");
+}
+
+static void
+emit_assembly(
+    codegen_x86_64_context *context,
+    ast *assembly
+)
+{
+    const char *saved_registers[5];
+    unsigned long saved_count = 0;
+    unsigned long output_count = assembly->assembly.outputs.count;
+    unsigned long input_count = assembly->assembly.inputs.count;
+    int stack_padding;
+
+    for (unsigned long index = 0; index < output_count; index++) {
+        assembly_save_callee_saved_register(
+            context,
+            assembly_output_register(
+                assembly->assembly.outputs.values[index]
+            ),
+            saved_registers,
+            &saved_count
+        );
+    }
+
+    for (unsigned long index = 0; index < input_count; index++) {
+        assembly_save_callee_saved_register(
+            context,
+            assembly_input_register(
+                assembly->assembly.inputs.values[index]
+            ),
+            saved_registers,
+            &saved_count
+        );
+    }
+
+    for (
+        unsigned long index = 0;
+        index < assembly->assembly.clobbers.count;
+        index++
+    ) {
+        ast *clobber = assembly->assembly.clobbers.values[index];
+
+        if (
+            strcmp(clobber->string.value, "memory") != 0 &&
+            strcmp(clobber->string.value, "cc") != 0
+        ) {
+            assembly_save_callee_saved_register(
+                context,
+                clobber->string.value,
+                saved_registers,
+                &saved_count
+            );
+        }
+    }
+
+    for (unsigned long index = output_count; index > 0; index--) {
+        ast *operand = assembly->assembly.outputs.values[index - 1];
+
+        codegen_x86_64_lvalue_address(
+            context,
+            operand->assembly_operand.expression
+        );
+        codegen_output_write(context->output, "    push rax\n");
+        context->stack_depth += 8;
+    }
+
+    for (unsigned long index = input_count; index > 0; index--) {
+        ast *operand = assembly->assembly.inputs.values[index - 1];
+
+        codegen_x86_64_expression(
+            context,
+            operand->assembly_operand.expression
+        );
+        codegen_output_write(context->output, "    push rax\n");
+        context->stack_depth += 8;
+    }
+
+    for (unsigned long index = 0; index < input_count; index++) {
+        codegen_output_printf(
+            context->output,
+            "    pop %s\n",
+            assembly_input_register(assembly->assembly.inputs.values[index])
+        );
+        context->stack_depth -= 8;
+    }
+
+    stack_padding = context->stack_depth % 16 != 0;
+    if (stack_padding) {
+        codegen_output_write(context->output, "    sub rsp, 8\n");
+        context->stack_depth += 8;
+    }
+
+    emit_assembly_template(context, assembly);
+
+    if (stack_padding) {
+        codegen_output_write(context->output, "    add rsp, 8\n");
+        context->stack_depth -= 8;
+    }
+
+    for (unsigned long index = output_count; index > 0; index--) {
+        codegen_output_printf(
+            context->output,
+            "    push %s\n",
+            assembly_output_register(assembly->assembly.outputs.values[index - 1])
+        );
+        context->stack_depth += 8;
+    }
+
+    for (unsigned long index = 0; index < output_count; index++) {
+        ast *operand = assembly->assembly.outputs.values[index];
+        const char *type;
+        unsigned long pointer_depth;
+        unsigned long size;
+
+        codegen_output_write(
+            context->output,
+            "    pop rcx\n"
+            "    pop rax\n"
+        );
+        context->stack_depth -= 16;
+
+        if (
+            codegen_x86_64_expression_type(
+                context,
+                operand->assembly_operand.expression,
+                &type,
+                &pointer_depth
+            )
+        ) {
+            size = codegen_x86_64_context_type_size(
+                context,
+                type,
+                pointer_depth
+            );
+            codegen_output_printf(
+                context->output,
+                "    mov %s [rax], %s\n",
+                codegen_x86_64_type_operand_size(type, pointer_depth),
+                assembly_low_register(size)
+            );
+        }
+    }
+
+    while (saved_count > 0) {
+        codegen_output_printf(
+            context->output,
+            "    pop %s\n",
+            saved_registers[--saved_count]
+        );
+        context->stack_depth -= 8;
+    }
 }
 
 
@@ -1287,6 +1589,10 @@ codegen_x86_64_statement(
                 context->epilogue_label
             );
 
+            return;
+
+        case AST_ASM:
+            emit_assembly(context, statement);
             return;
 
 

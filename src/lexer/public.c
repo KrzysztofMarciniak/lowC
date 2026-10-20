@@ -308,6 +308,9 @@ lexer_print_tokens(
                 case TOKEN_STRUCT:
                     printf("STRUCT");
                     break;
+                case TOKEN_ASM:
+                    printf("ASM");
+                    break;
 
                 case TOKEN_INCLUDE:
                     printf("INCLUDE");

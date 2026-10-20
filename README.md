@@ -399,8 +399,8 @@ import a dependency directly to use its names from another file.
 
 `make install` also installs public standard-library modules beneath
 `$(PREFIX)/share/lowc/public` (by default,
-`/usr/local/share/lowc/public`). The first module provides string output on
-Linux x86-64:
+`/usr/local/share/lowc/public`). Its `print.lowc` module provides string
+output on Linux x86-64:
 
 ```c
 #include "/usr/local/share/lowc/public/print.lowc" : "print";
@@ -419,12 +419,92 @@ initial API.
 Use `strlen` directly by importing `string.lowc`:
 
 ```c
-#include "/usr/local/share/lowc/public/string.lowc" : "strlen";
+#include "/usr/local/share/lowc/public/string.lowc" :
+    "strlen", "strcmp", "strcpy", "strcat", "strdup";
+#include "/usr/local/share/lowc/public/memory.lowc" : "dealloc";
 
-u64 length() {
-    return strlen("Hello");
+u64 string_example() {
+    u8 *copy = strdup("Hello");
+    u64 length = strlen(copy);
+    dealloc(copy);
+    return length;
 }
 ```
 
+`strcmp` returns a negative value, zero, or a positive value for less-than,
+equal, or greater-than strings. `strcpy` and `strcat` return the destination;
+the caller must provide enough space. `strdup` returns a heap-allocated copy
+that should be released with `dealloc`.
+
+The `memory.lowc` module provides Linux x86-64 `mmap`-backed allocations:
+
+```c
+#include "/usr/local/share/lowc/public/memory.lowc" : "alloc", "dealloc";
+
+u1 allocation_example() {
+    u8 *buffer = alloc(128);
+    buffer[0] = 42;
+    return dealloc(buffer);
+}
+```
+
+Allocation failure terminates the process with status 1. `dealloc` returns
+whether the underlying unmap succeeded; only pass it pointers returned by
+`alloc` or `strdup`, and release each allocation once.
+
+The `hashmap.lowc` module provides an open-addressed `u64`-to-`u64` map with
+linear probing and automatic growth. Import `HashMap`, `hashmap_init`,
+`hashmap_set`, `hashmap_get`, `hashmap_remove`, and `hashmap_deinit`. Initialize
+the struct before use; `hashmap_get` writes into its output pointer and returns
+whether the key existed:
+
+```c
+#include "/usr/local/share/lowc/public/hashmap.lowc" :
+    "HashMap", "hashmap_init", "hashmap_set",
+    "hashmap_get", "hashmap_remove", "hashmap_deinit";
+
+u1 hashmap_example() {
+    struct HashMap map;
+    u64 value;
+
+    hashmap_init(&map, 8);
+    hashmap_set(&map, 42, 100);
+    if (!hashmap_get(&map, 42, &value) || value != 100) {
+        hashmap_deinit(&map);
+        return 0;
+    }
+    return hashmap_deinit(&map);
+}
+```
+
+The initial capacity is raised to at least eight and the map grows before its
+load reaches 75%. Keys and values are unsigned 64-bit integers; `hashmap_remove`
+marks removed slots for reuse, and `hashmap_deinit` releases the map's backing
+allocations. Do not use the map after deinitializing it.
+
 Use your configured `PREFIX` in standard-library import paths when it differs
 from `/usr/local`.
+
+## Inline assembly
+
+Inline assembly is a statement and currently supports the x86-64 backend's
+Intel-syntax assembly. Outputs precede inputs; each operand names a fixed
+register, and `%0`, `%1`, and subsequent placeholders refer to outputs first,
+then inputs:
+
+```c
+u64 result;
+asm("mov %0, %1" : "=rax"(result) : "rdi"(42) : "rcx");
+```
+
+Output constraints use `"=register"(lvalue)` and input constraints use
+`"register"(expression)`. The supported 64-bit general-purpose registers are
+`rax`, `rbx`, `rcx`, `rdx`, `rsi`, `rdi`, and `r8` through `r15`. The clobber
+list names registers the template modifies; `"memory"` declares memory
+effects and `"cc"` declares condition-code effects. Output registers are
+already treated as modified. Use `%%` for a
+literal percent sign, and write empty sections explicitly (for example,
+`asm("nop" : : :);`). The compiler preserves
+callee-saved registers named as operands or clobbers. `rsp` and `rbp` are
+reserved and cannot be operands or clobbers; templates must not modify them.
+Other code-generation targets reject inline assembly.

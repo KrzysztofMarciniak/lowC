@@ -1,12 +1,19 @@
-u64 __lowc_strlen(u8 *data) {
-    u64 length;
+void __lowc_write_stdout(u8 *data, u64 length) {
+    for (; length != 0; ) {
+        s64 written;
 
-    for (length = 0; data[length] != 0; length = length + 1) {
+        asm("syscall"
+            : "=rax"(written)
+            : "rax"(1), "rdi"(1), "rsi"(data), "rdx"(length)
+            : "rcx", "r11", "memory", "cc");
+
+        if (written <= 0) {
+            return;
+        }
+
+        data = data + written;
+        length = length - written;
     }
 
-    return length;
-}
-
-void __lowc_write_stdout(u8 *data, u64 length) {
     return;
 }

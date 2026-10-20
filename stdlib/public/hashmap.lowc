@@ -1,0 +1,202 @@
+#include "memory.lowc" : "alloc", "dealloc";
+
+struct HashMap {
+    u64 *keys;
+    u64 *values;
+    u8 *states;
+    u64 capacity;
+    u64 count;
+};
+
+u64 hashmap_index(u64 key, u64 capacity) {
+    u64 index;
+
+    asm(
+        "xor rdx, rdx\ndiv %2\nmov %0, rdx"
+        : "=rax"(index)
+        : "rax"(key), "rsi"(capacity)
+        : "rdx", "cc"
+    );
+
+    return index;
+}
+
+void hashmap_place(
+    struct HashMap *map,
+    u64 key,
+    u64 value
+) {
+    u64 index;
+    u64 probes;
+    u64 first_deleted;
+    u1 found;
+
+    index = hashmap_index(key, map->capacity);
+    probes = 0;
+    first_deleted = map->capacity;
+    found = 0;
+
+    for (
+        ;
+        probes < map->capacity &&
+            found == 0 &&
+            map->states[index] != 0;
+        probes = probes + 1
+    ) {
+        if (map->states[index] == 1 && map->keys[index] == key) {
+            found = 1;
+        } else {
+            if (
+                map->states[index] == 2 &&
+                first_deleted == map->capacity
+            ) {
+                first_deleted = index;
+            }
+            index = (index + 1) % map->capacity;
+        }
+    }
+
+    if (found == 0 && first_deleted < map->capacity) {
+        index = first_deleted;
+    }
+
+    if (map->states[index] != 1) {
+        map->count = map->count + 1;
+    }
+
+    map->keys[index] = key;
+    map->values[index] = value;
+    map->states[index] = 1;
+}
+
+void hashmap_resize(struct HashMap *map, u64 capacity) {
+    u64 *old_keys;
+    u64 *old_values;
+    u8 *old_states;
+    u64 old_capacity;
+    u64 index;
+
+    old_keys = map->keys;
+    old_values = map->values;
+    old_states = map->states;
+    old_capacity = map->capacity;
+
+    map->capacity = capacity;
+    map->count = 0;
+    map->keys = alloc(capacity * 8);
+    map->values = alloc(capacity * 8);
+    map->states = alloc(capacity);
+
+    for (index = 0; index < capacity; index = index + 1) {
+        map->states[index] = 0;
+    }
+
+    for (index = 0; index < old_capacity; index = index + 1) {
+        if (old_states[index] == 1) {
+            hashmap_place(
+                map,
+                old_keys[index],
+                old_values[index]
+            );
+        }
+    }
+
+    dealloc(old_keys);
+    dealloc(old_values);
+    dealloc(old_states);
+}
+
+void hashmap_init(struct HashMap *map, u64 capacity) {
+    u64 index;
+
+    if (capacity < 8) {
+        capacity = 8;
+    }
+
+    map->capacity = capacity;
+    map->count = 0;
+    map->keys = alloc(capacity * 8);
+    map->values = alloc(capacity * 8);
+    map->states = alloc(capacity);
+
+    for (index = 0; index < capacity; index = index + 1) {
+        map->states[index] = 0;
+    }
+}
+
+void hashmap_set(struct HashMap *map, u64 key, u64 value) {
+    if ((map->count + 1) * 4 >= map->capacity * 3) {
+        hashmap_resize(map, map->capacity * 2);
+    }
+
+    hashmap_place(map, key, value);
+}
+
+u1 hashmap_get(struct HashMap *map, u64 key, u64 *value) {
+    u64 index;
+    u64 probes;
+    u1 found;
+
+    index = hashmap_index(key, map->capacity);
+    probes = 0;
+    found = 0;
+
+    for (
+        ;
+        probes < map->capacity &&
+            found == 0 &&
+            map->states[index] != 0;
+        probes = probes + 1
+    ) {
+        if (map->states[index] == 1 && map->keys[index] == key) {
+            *value = map->values[index];
+            found = 1;
+        } else {
+            index = (index + 1) % map->capacity;
+        }
+    }
+
+    return found;
+}
+
+u1 hashmap_remove(struct HashMap *map, u64 key) {
+    u64 index;
+    u64 probes;
+    u1 found;
+
+    index = hashmap_index(key, map->capacity);
+    probes = 0;
+    found = 0;
+
+    for (
+        ;
+        probes < map->capacity &&
+            found == 0 &&
+            map->states[index] != 0;
+        probes = probes + 1
+    ) {
+        if (map->states[index] == 1 && map->keys[index] == key) {
+            map->states[index] = 2;
+            map->count = map->count - 1;
+            found = 1;
+        } else {
+            index = (index + 1) % map->capacity;
+        }
+    }
+
+    return found;
+}
+
+u1 hashmap_deinit(struct HashMap *map) {
+    u1 keys_freed;
+    u1 values_freed;
+    u1 states_freed;
+
+    keys_freed = dealloc(map->keys);
+    values_freed = dealloc(map->values);
+    states_freed = dealloc(map->states);
+    map->capacity = 0;
+    map->count = 0;
+
+    return keys_freed && values_freed && states_freed;
+}

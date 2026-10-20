@@ -291,6 +291,9 @@ lexer_keyword(
     if (strcmp(value, "struct") == 0)
         return TOKEN_STRUCT;
 
+    if (strcmp(value, "asm") == 0)
+        return TOKEN_ASM;
+
     return TOKEN_IDENTIFIER;
 }
 

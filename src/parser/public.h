@@ -26,6 +26,8 @@ typedef enum ast_type
     AST_RETURN,
 
     AST_ASSIGNMENT,
+    AST_ASM,
+    AST_ASM_OPERAND,
 
     AST_INTEGER,
     AST_STRING,
@@ -191,6 +193,22 @@ struct ast
             ast *left;
             ast *right;
         } assignment;
+
+        /* AST_ASM */
+        struct
+        {
+            char *template;
+            ast_list outputs;
+            ast_list inputs;
+            ast_list clobbers;
+        } assembly;
+
+        /* AST_ASM_OPERAND */
+        struct
+        {
+            char *constraint;
+            ast *expression;
+        } assembly_operand;
 
         /* AST_INTEGER */
         struct

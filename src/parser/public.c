@@ -698,6 +698,43 @@ parser_print_ast_node(
 
             break;
 
+        case AST_ASM:
+            printf("ASM\n");
+
+            parser_print_indent(depth + 1);
+            printf(
+                "template: %s\n",
+                tree->assembly.template != NULL
+                    ? tree->assembly.template
+                    : "(null)"
+            );
+
+            parser_print_indent(depth + 1);
+            printf("outputs:\n");
+            parser_print_list(&tree->assembly.outputs, depth + 2);
+
+            parser_print_indent(depth + 1);
+            printf("inputs:\n");
+            parser_print_list(&tree->assembly.inputs, depth + 2);
+
+            parser_print_indent(depth + 1);
+            printf("clobbers:\n");
+            parser_print_list(&tree->assembly.clobbers, depth + 2);
+            break;
+
+        case AST_ASM_OPERAND:
+            printf(
+                "ASM_OPERAND: %s\n",
+                tree->assembly_operand.constraint != NULL
+                    ? tree->assembly_operand.constraint
+                    : "(null)"
+            );
+            parser_print_ast_node(
+                tree->assembly_operand.expression,
+                depth + 1
+            );
+            break;
+
         case AST_INTEGER:
             printf(
                 "INTEGER: %s\n",

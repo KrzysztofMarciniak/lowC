@@ -88,10 +88,16 @@ install: release
 	$(INSTALL) -d "$(DESTDIR)$(BINDIR)"
 	$(INSTALL) -m 0755 "$(TARGET)" "$(DESTDIR)$(BINDIR)/lowc"
 	$(INSTALL) -d "$(DESTDIR)$(LOWC_PUBLIC_DIR)"
+	$(INSTALL) -m 0644 stdlib/public/hashmap.lowc "$(DESTDIR)$(LOWC_PUBLIC_DIR)/hashmap.lowc"
+	$(INSTALL) -m 0644 stdlib/public/memory.lowc "$(DESTDIR)$(LOWC_PUBLIC_DIR)/memory.lowc"
 	$(INSTALL) -m 0644 stdlib/public/print.lowc "$(DESTDIR)$(LOWC_PUBLIC_DIR)/print.lowc"
 	$(INSTALL) -m 0644 stdlib/public/string.lowc "$(DESTDIR)$(LOWC_PUBLIC_DIR)/string.lowc"
+	$(INSTALL) -d "$(DESTDIR)$(LOWC_INTERNAL_DIR)/memory"
+	$(INSTALL) -m 0644 stdlib/internal/memory/main.lowc "$(DESTDIR)$(LOWC_INTERNAL_DIR)/memory/main.lowc"
 	$(INSTALL) -d "$(DESTDIR)$(LOWC_INTERNAL_DIR)/print"
 	$(INSTALL) -m 0644 stdlib/internal/print/main.lowc "$(DESTDIR)$(LOWC_INTERNAL_DIR)/print/main.lowc"
+	$(INSTALL) -d "$(DESTDIR)$(LOWC_INTERNAL_DIR)/string"
+	$(INSTALL) -m 0644 stdlib/internal/string/main.lowc "$(DESTDIR)$(LOWC_INTERNAL_DIR)/string/main.lowc"
 
 -include $(DEPFILES)
 

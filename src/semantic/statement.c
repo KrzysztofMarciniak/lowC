@@ -28,6 +28,292 @@ semantic_strdup(
     return copy;
 }
 
+static int
+semantic_asm_is_register(
+    const char *name
+)
+{
+    static const char *registers[] = {
+        "rax", "rbx", "rcx", "rdx",
+        "rsi", "rdi", "r8", "r9",
+        "r10", "r11", "r12", "r13",
+        "r14", "r15", "rsp", "rbp"
+    };
+
+    for (unsigned long index = 0;
+         index < sizeof(registers) / sizeof(registers[0]);
+         index++) {
+        if (strcmp(name, registers[index]) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
+static int
+semantic_asm_is_forbidden_register(
+    const char *name
+)
+{
+    return strcmp(name, "rsp") == 0 || strcmp(name, "rbp") == 0;
+}
+
+static int
+semantic_asm_is_lvalue(
+    ast *expression
+)
+{
+    if (!expression)
+        return 0;
+
+    switch (expression->type) {
+        case AST_IDENTIFIER:
+        case AST_INDEX:
+        case AST_MEMBER:
+        case AST_POINTER_MEMBER:
+            return 1;
+
+        case AST_UNARY:
+            return expression->unary.operator == AST_UNARY_DEREFERENCE;
+
+        default:
+            return 0;
+    }
+}
+
+static int
+semantic_asm_type_supported(
+    const semantic_type *type
+)
+{
+    if (!type)
+        return 0;
+
+    if (type->kind == SEMANTIC_TYPE_POINTER)
+        return 1;
+
+    switch (type->kind) {
+        case SEMANTIC_TYPE_U1:
+        case SEMANTIC_TYPE_U2:
+        case SEMANTIC_TYPE_U4:
+        case SEMANTIC_TYPE_U8:
+        case SEMANTIC_TYPE_U16:
+        case SEMANTIC_TYPE_U32:
+        case SEMANTIC_TYPE_U64:
+        case SEMANTIC_TYPE_S1:
+        case SEMANTIC_TYPE_S2:
+        case SEMANTIC_TYPE_S4:
+        case SEMANTIC_TYPE_S8:
+        case SEMANTIC_TYPE_S16:
+        case SEMANTIC_TYPE_S32:
+        case SEMANTIC_TYPE_S64:
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
+static int
+semantic_check_assembly(
+    semantic_context *context,
+    ast *assembly,
+    char **error_text
+)
+{
+    unsigned long output_count = assembly->assembly.outputs.count;
+    unsigned long input_count = assembly->assembly.inputs.count;
+    unsigned long operand_count = output_count + input_count;
+
+    for (unsigned long index = 0; index < output_count; index++) {
+        ast *operand = assembly->assembly.outputs.values[index];
+        const char *constraint = operand->assembly_operand.constraint;
+        const char *register_name = constraint && constraint[0] == '='
+            ? constraint + 1
+            : "";
+        semantic_type *type;
+
+        if (
+            constraint == NULL ||
+            constraint[0] != '=' ||
+            !semantic_asm_is_register(register_name) ||
+            semantic_asm_is_forbidden_register(register_name)
+        ) {
+            *error_text = semantic_strdup(
+                "invalid inline assembly output register constraint"
+            );
+            return 1;
+        }
+
+        if (!semantic_asm_is_lvalue(operand->assembly_operand.expression)) {
+            *error_text = semantic_strdup(
+                "inline assembly output must be an assignable lvalue"
+            );
+            return 1;
+        }
+
+        for (unsigned long previous = 0; previous < index; previous++) {
+            const char *previous_constraint =
+                assembly->assembly.outputs.values[previous]
+                    ->assembly_operand.constraint;
+
+            if (strcmp(register_name, previous_constraint + 1) == 0) {
+                *error_text = semantic_strdup(
+                    "inline assembly output registers must be unique"
+                );
+                return 1;
+            }
+        }
+
+        type = semantic_check_expression(
+            context,
+            operand->assembly_operand.expression,
+            error_text
+        );
+        if (type == NULL)
+            return 1;
+
+        if (!semantic_asm_type_supported(type)) {
+            semantic_type_free(type);
+            *error_text = semantic_strdup(
+                "inline assembly outputs require integer or pointer values"
+            );
+            return 1;
+        }
+
+        semantic_type_free(type);
+    }
+
+    for (unsigned long index = 0; index < input_count; index++) {
+        ast *operand = assembly->assembly.inputs.values[index];
+        const char *register_name =
+            operand->assembly_operand.constraint;
+        semantic_type *type;
+
+        if (
+            !semantic_asm_is_register(register_name) ||
+            semantic_asm_is_forbidden_register(register_name)
+        ) {
+            *error_text = semantic_strdup(
+                "invalid inline assembly input register constraint"
+            );
+            return 1;
+        }
+
+        for (unsigned long previous = 0; previous < index; previous++) {
+            if (strcmp(
+                    register_name,
+                    assembly->assembly.inputs.values[previous]
+                        ->assembly_operand.constraint
+                ) == 0) {
+                *error_text = semantic_strdup(
+                    "inline assembly input registers must be unique"
+                );
+                return 1;
+            }
+        }
+
+        type = semantic_check_expression(
+            context,
+            operand->assembly_operand.expression,
+            error_text
+        );
+        if (type == NULL)
+            return 1;
+
+        if (!semantic_asm_type_supported(type)) {
+            semantic_type_free(type);
+            *error_text = semantic_strdup(
+                "inline assembly inputs require integer or pointer values"
+            );
+            return 1;
+        }
+
+        semantic_type_free(type);
+    }
+
+    for (
+        unsigned long index = 0;
+        index < assembly->assembly.clobbers.count;
+        index++
+    ) {
+        const char *clobber =
+            assembly->assembly.clobbers.values[index]->string.value;
+
+        if (
+            strcmp(clobber, "memory") != 0 &&
+            strcmp(clobber, "cc") != 0 &&
+            (
+                !semantic_asm_is_register(clobber) ||
+                semantic_asm_is_forbidden_register(clobber)
+            )
+        ) {
+            *error_text = semantic_strdup(
+                "invalid inline assembly clobber"
+            );
+            return 1;
+        }
+
+        for (unsigned long previous = 0; previous < index; previous++) {
+            if (strcmp(
+                    clobber,
+                    assembly->assembly.clobbers.values[previous]
+                        ->string.value
+                ) == 0) {
+                *error_text = semantic_strdup(
+                    "inline assembly clobbers must be unique"
+                );
+                return 1;
+            }
+        }
+    }
+
+    for (
+        unsigned long index = 0;
+        assembly->assembly.template[index] != '\0';
+        index++
+    ) {
+        unsigned long placeholder = 0;
+
+        if (assembly->assembly.template[index] != '%')
+            continue;
+
+        index++;
+        if (assembly->assembly.template[index] == '%')
+            continue;
+
+        if (
+            assembly->assembly.template[index] < '0' ||
+            assembly->assembly.template[index] > '9'
+        ) {
+            *error_text = semantic_strdup(
+                "inline assembly '%' must start a numbered operand or be escaped as '%%'"
+            );
+            return 1;
+        }
+
+        do {
+            placeholder =
+                placeholder * 10 +
+                (unsigned long)(assembly->assembly.template[index] - '0');
+            index++;
+        } while (
+            assembly->assembly.template[index] >= '0' &&
+            assembly->assembly.template[index] <= '9'
+        );
+        index--;
+
+        if (placeholder >= operand_count) {
+            *error_text = semantic_strdup(
+                "inline assembly operand placeholder is out of range"
+            );
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 
 int
 semantic_check_statement(
@@ -330,6 +616,13 @@ semantic_check_statement(
 
             return 0;
         }
+
+        case AST_ASM:
+            return semantic_check_assembly(
+                context,
+                statement,
+                error_text
+            );
 
 
         case AST_BLOCK:

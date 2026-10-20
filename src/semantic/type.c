@@ -363,6 +363,15 @@ semantic_type_assignable(
     )
         return 1;
 
+    if (
+        destination->kind == SEMANTIC_TYPE_POINTER &&
+        source->kind == SEMANTIC_TYPE_POINTER &&
+        (
+            destination->pointer.element->kind == SEMANTIC_TYPE_VOID ||
+            source->pointer.element->kind == SEMANTIC_TYPE_VOID
+        )
+    )
+        return 1;
 
     return semantic_type_equal(
         destination,
@@ -480,4 +489,3 @@ semantic_type_free(
 
     free(type);
 }
-

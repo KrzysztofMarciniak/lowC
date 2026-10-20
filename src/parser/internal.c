@@ -199,6 +199,9 @@ parser_token_name(
         case TOKEN_STRUCT:
             return "'struct'";
 
+        case TOKEN_ASM:
+            return "'asm'";
+
         case TOKEN_IF:
             return "'if'";
 
@@ -1411,6 +1414,204 @@ parser_parse_statement(
 
     if (current->type == TOKEN_RETURN)
         return parser_parse_return(state);
+
+    if (current->type == TOKEN_ASM)
+    {
+        ast *assembly;
+
+        assembly = parser_new_node(AST_ASM, current);
+        if (assembly == NULL)
+            return NULL;
+        parser_advance(state);
+
+        if (
+            !parser_expect(state, TOKEN_LPAREN) ||
+            parser_current(state) == NULL ||
+            parser_current(state)->type != TOKEN_STRING
+        ) {
+            if (state->error_text == NULL) {
+                parser_set_error(
+                    state,
+                    "expected an assembly template string."
+                );
+            }
+            parser_free(assembly);
+            return NULL;
+        }
+
+        assembly->assembly.template =
+            parser_copy_string(parser_advance(state)->value);
+        if (assembly->assembly.template == NULL) {
+            parser_free(assembly);
+            return NULL;
+        }
+
+        if (!parser_expect(state, TOKEN_COLON)) {
+            parser_free(assembly);
+            return NULL;
+        }
+
+        while (
+            parser_current(state) != NULL &&
+            parser_current(state)->type != TOKEN_COLON
+        ) {
+            token *constraint;
+            ast *operand;
+
+            constraint = parser_current(state);
+            if (constraint->type != TOKEN_STRING) {
+                parser_set_error(
+                    state,
+                    "expected an output register constraint string."
+                );
+                parser_free(assembly);
+                return NULL;
+            }
+            parser_advance(state);
+
+            operand = parser_new_node(AST_ASM_OPERAND, constraint);
+            if (operand == NULL) {
+                parser_free(assembly);
+                return NULL;
+            }
+            operand->assembly_operand.constraint =
+                parser_copy_string(constraint->value);
+            if (
+                operand->assembly_operand.constraint == NULL ||
+                !parser_expect(state, TOKEN_LPAREN)
+            ) {
+                parser_free(operand);
+                parser_free(assembly);
+                return NULL;
+            }
+            operand->assembly_operand.expression =
+                parser_parse_expression(state);
+            if (
+                operand->assembly_operand.expression == NULL ||
+                !parser_expect(state, TOKEN_RPAREN)
+            ) {
+                parser_free(operand);
+                parser_free(assembly);
+                return NULL;
+            }
+            if (!parser_append_ast(&assembly->assembly.outputs, operand)) {
+                parser_free(operand);
+                parser_free(assembly);
+                return NULL;
+            }
+            if (!parser_match(state, TOKEN_COMMA))
+                break;
+        }
+
+        if (!parser_expect(state, TOKEN_COLON)) {
+            parser_free(assembly);
+            return NULL;
+        }
+
+        while (
+            parser_current(state) != NULL &&
+            parser_current(state)->type != TOKEN_COLON
+        ) {
+            token *constraint;
+            ast *operand;
+
+            constraint = parser_current(state);
+            if (constraint->type != TOKEN_STRING) {
+                parser_set_error(
+                    state,
+                    "expected an input register constraint string."
+                );
+                parser_free(assembly);
+                return NULL;
+            }
+            parser_advance(state);
+
+            operand = parser_new_node(AST_ASM_OPERAND, constraint);
+            if (operand == NULL) {
+                parser_free(assembly);
+                return NULL;
+            }
+            operand->assembly_operand.constraint =
+                parser_copy_string(constraint->value);
+            if (
+                operand->assembly_operand.constraint == NULL ||
+                !parser_expect(state, TOKEN_LPAREN)
+            ) {
+                parser_free(operand);
+                parser_free(assembly);
+                return NULL;
+            }
+            operand->assembly_operand.expression =
+                parser_parse_expression(state);
+            if (
+                operand->assembly_operand.expression == NULL ||
+                !parser_expect(state, TOKEN_RPAREN)
+            ) {
+                parser_free(operand);
+                parser_free(assembly);
+                return NULL;
+            }
+            if (!parser_append_ast(&assembly->assembly.inputs, operand)) {
+                parser_free(operand);
+                parser_free(assembly);
+                return NULL;
+            }
+            if (!parser_match(state, TOKEN_COMMA))
+                break;
+        }
+
+        if (!parser_expect(state, TOKEN_COLON)) {
+            parser_free(assembly);
+            return NULL;
+        }
+
+        while (
+            parser_current(state) != NULL &&
+            parser_current(state)->type != TOKEN_RPAREN
+        ) {
+            token *clobber;
+            ast *clobber_node;
+
+            clobber = parser_current(state);
+            if (clobber->type != TOKEN_STRING) {
+                parser_set_error(
+                    state,
+                    "expected a clobber name string."
+                );
+                parser_free(assembly);
+                return NULL;
+            }
+
+            clobber_node = parser_new_node(AST_STRING, clobber);
+            if (clobber_node == NULL) {
+                parser_free(assembly);
+                return NULL;
+            }
+            clobber_node->string.value =
+                parser_copy_string(clobber->value);
+            if (
+                clobber_node->string.value == NULL ||
+                !parser_append_ast(&assembly->assembly.clobbers, clobber_node)
+            ) {
+                parser_free(clobber_node);
+                parser_free(assembly);
+                return NULL;
+            }
+            parser_advance(state);
+            if (!parser_match(state, TOKEN_COMMA))
+                break;
+        }
+
+        if (
+            !parser_expect(state, TOKEN_RPAREN) ||
+            !parser_expect(state, TOKEN_SEMICOLON)
+        ) {
+            parser_free(assembly);
+            return NULL;
+        }
+
+        return assembly;
+    }
 
     if (parser_is_type(current->type))
         return parser_parse_variable_declaration(state);
@@ -2975,6 +3176,18 @@ parser_free(
                 node->assignment.right
             );
 
+            break;
+
+        case AST_ASM:
+            free(node->assembly.template);
+            parser_free_list(&node->assembly.outputs);
+            parser_free_list(&node->assembly.inputs);
+            parser_free_list(&node->assembly.clobbers);
+            break;
+
+        case AST_ASM_OPERAND:
+            free(node->assembly_operand.constraint);
+            parser_free(node->assembly_operand.expression);
             break;
 
         case AST_INTEGER:
