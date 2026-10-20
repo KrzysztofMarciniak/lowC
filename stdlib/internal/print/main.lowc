@@ -1,0 +1,12 @@
+u64 __lowc_strlen(u8 *data) {
+    u64 length;
+
+    for (length = 0; data[length] != 0; length = length + 1) {
+    }
+
+    return length;
+}
+
+void __lowc_write_stdout(u8 *data, u64 length) {
+    return;
+}

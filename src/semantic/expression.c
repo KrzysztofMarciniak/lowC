@@ -1056,6 +1056,28 @@ semantic_check_expression(
             return result;
         }
 
+        case AST_STRING:
+        {
+            semantic_type *element;
+            semantic_type *result;
+
+            element = semantic_type_builtin("u8");
+            if (element == NULL)
+            {
+                *error_text = semantic_strdup("out of memory");
+                return NULL;
+            }
+
+            result = semantic_type_pointer(element);
+            if (result == NULL)
+            {
+                semantic_type_free(element);
+                *error_text = semantic_strdup("out of memory");
+            }
+
+            return result;
+        }
+
 
         case AST_IDENTIFIER:
         {

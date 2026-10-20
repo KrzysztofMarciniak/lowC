@@ -193,6 +193,11 @@ codegen_x86_64_expression_type(
             *pointer_depth = 0;
             return 1;
 
+        case AST_STRING:
+            *type = "u8";
+            *pointer_depth = 1;
+            return 1;
+
         case AST_UNARY:
             if (!codegen_x86_64_expression_type(
                     context,
@@ -425,6 +430,66 @@ emit_integer(
         context->output,
         "    mov rax, %s\n",
         expression->integer.value
+    );
+}
+
+static void
+emit_string(
+    codegen_x86_64_context *context,
+    ast *expression
+)
+{
+    const unsigned char *text;
+    unsigned long label;
+    unsigned long index;
+
+    text = (const unsigned char *)expression->string.value;
+    label = context->label_count++;
+
+    codegen_output_write(context->output, ".section .rodata\n");
+    codegen_output_printf(context->output, ".Lstring%lu:\n", label);
+
+    for (index = 0; text[index] != '\0'; index++) {
+        unsigned char value = text[index];
+
+        if (value == '\\' && text[index + 1] != '\0') {
+            index++;
+            switch (text[index]) {
+                case 'n':
+                    value = '\n';
+                    break;
+                case 'r':
+                    value = '\r';
+                    break;
+                case 't':
+                    value = '\t';
+                    break;
+                case '\\':
+                case '"':
+                    value = text[index];
+                    break;
+                default:
+                    value = text[index];
+                    break;
+            }
+        }
+
+        codegen_output_printf(
+            context->output,
+            "    .byte %u\n",
+            (unsigned int)value
+        );
+    }
+
+    codegen_output_write(
+        context->output,
+        "    .byte 0\n"
+        ".text\n"
+    );
+    codegen_output_printf(
+        context->output,
+        "    lea rax, [rip + .Lstring%lu]\n",
+        label
     );
 }
 
@@ -1669,6 +1734,15 @@ codegen_x86_64_expression(
         case AST_INTEGER:
 
             emit_integer(
+                context,
+                expression
+            );
+
+            return;
+
+        case AST_STRING:
+
+            emit_string(
                 context,
                 expression
             );

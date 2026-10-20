@@ -7,24 +7,7 @@ BIN="${1:-$SCRIPT_DIR/../../build/lowc}"
 TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/lowc-tests.XXXXXX") || exit 1
 
 cleanup() {
-    rm -f "$TEMP_DIR/program with space" \
-        "$TEMP_DIR/program-unoptimized" \
-        "$TEMP_DIR/module-program" \
-        "$TEMP_DIR/modules-program" \
-        "$TEMP_DIR/optimized.s" \
-        "$TEMP_DIR/unoptimized.s" \
-        "$TEMP_DIR/harness" \
-        "$TEMP_DIR/harness-unoptimized" \
-        "$TEMP_DIR/modules.s" \
-        "$TEMP_DIR/modules-harness" \
-        "$TEMP_DIR/visibility-program" \
-        "$TEMP_DIR/visibility.s" \
-        "$TEMP_DIR/visibility-harness" \
-        "$TEMP_DIR/hidden-function.out" \
-        "$TEMP_DIR/hidden-global.out" \
-        "$TEMP_DIR/hidden-struct.out" \
-        "$TEMP_DIR/hidden-dependency.out"
-    rmdir "$TEMP_DIR"
+    rm -rf "$TEMP_DIR"
 }
 trap cleanup EXIT
 
@@ -160,6 +143,68 @@ if ! "$TEMP_DIR/harness-unoptimized"; then
     exit 1
 fi
 
+if ! make -C "$SCRIPT_DIR/../.." install \
+    DESTDIR="$TEMP_DIR" PREFIX=/usr/local >/dev/null
+then
+    echo "FAIL [standard library] could not stage installed public modules"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/standard-library-print.lowc" <<EOF
+#include "$TEMP_DIR/usr/local/share/lowc/public/print.lowc" : "print";
+#include "$TEMP_DIR/usr/local/share/lowc/public/string.lowc" : "strlen";
+
+void entrypoint() {
+    u64 length = strlen("Hello, World\\n");
+    print("Hello, World\\n");
+}
+EOF
+
+cat >"$TEMP_DIR/entrypoint_harness.c" <<'EOF'
+void entrypoint(void);
+
+int
+main(void)
+{
+    entrypoint();
+    return 0;
+}
+EOF
+
+for mode in unoptimized optimized; do
+    if [ "$mode" = optimized ]; then
+        optimization=-O1
+    else
+        optimization=
+    fi
+
+    if ! "$BIN" "$TEMP_DIR/standard-library-print.lowc" $optimization \
+        -o "$TEMP_DIR/print-$mode"
+    then
+        echo "FAIL [standard library] $mode print program did not build"
+        exit 1
+    fi
+
+    if ! "$TEMP_DIR/print-$mode" >"$TEMP_DIR/print-$mode.out" ||
+       ! printf 'Hello, World\n' | cmp -s - "$TEMP_DIR/print-$mode.out"
+    then
+        echo "FAIL [standard library] $mode print output was incorrect"
+        exit 1
+    fi
+done
+
+if ! "$BIN" --asm "$TEMP_DIR/standard-library-print.lowc" \
+    >"$TEMP_DIR/print.s" ||
+   ! cc -x assembler "$TEMP_DIR/print.s" -x c \
+        "$TEMP_DIR/entrypoint_harness.c" -o "$TEMP_DIR/print-asm" ||
+   ! "$TEMP_DIR/print-asm" >"$TEMP_DIR/print-asm.out" ||
+   ! printf 'Hello, World\n' | cmp -s - "$TEMP_DIR/print-asm.out"
+then
+    echo "FAIL [standard library] assembly print output was incorrect"
+    exit 1
+fi
+
 echo "ok   [modules] imported functions, structs, and globals assemble, link, and run"
 echo "ok   [modules] unimported functions, structs, and globals are rejected"
 echo "ok   [executable] optimized and unoptimized output assembles, links, and runs"
+echo "ok   [standard library] installed print module writes exact output"

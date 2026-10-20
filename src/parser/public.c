@@ -708,6 +708,16 @@ parser_print_ast_node(
 
             break;
 
+        case AST_STRING:
+            printf(
+                "STRING: %s\n",
+                tree->string.value != NULL
+                    ? tree->string.value
+                    : "(null)"
+            );
+
+            break;
+
         case AST_IDENTIFIER:
             printf(
                 "IDENTIFIER: %s\n",

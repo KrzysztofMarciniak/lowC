@@ -2683,6 +2683,33 @@ parser_parse_primary(
         return node;
     }
 
+    if (current->type == TOKEN_STRING)
+    {
+        node =
+            parser_new_node(
+                AST_STRING,
+                current
+            );
+
+        if (node == NULL)
+            return NULL;
+
+        node->string.value =
+            parser_copy_string(
+                current->value
+            );
+
+        if (node->string.value == NULL)
+        {
+            parser_free(node);
+            return NULL;
+        }
+
+        parser_advance(state);
+
+        return node;
+    }
+
     if (current->type == TOKEN_IDENTIFIER)
     {
         node =
@@ -2952,6 +2979,10 @@ parser_free(
 
         case AST_INTEGER:
             free(node->integer.value);
+            break;
+
+        case AST_STRING:
+            free(node->string.value);
             break;
 
         case AST_IDENTIFIER:

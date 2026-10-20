@@ -1,0 +1,7 @@
+#include "../internal/print/main.lowc" : "__lowc_write_stdout";
+#include "string.lowc" : "strlen";
+
+void print(u8 *data) {
+    __lowc_write_stdout(data, strlen(data));
+    return;
+}

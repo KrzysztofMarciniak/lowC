@@ -388,6 +388,13 @@ lexer_string(
         lexer_current(state) != '"'
     )
     {
+        if (lexer_current(state) == '\\' && lexer_peek(state) != '\0')
+        {
+            lexer_advance(state);
+            lexer_advance(state);
+            continue;
+        }
+
         if (lexer_current(state) == '\n')
         {
             return (token) {

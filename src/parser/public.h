@@ -28,6 +28,7 @@ typedef enum ast_type
     AST_ASSIGNMENT,
 
     AST_INTEGER,
+    AST_STRING,
     AST_IDENTIFIER,
 
     AST_UNARY,
@@ -196,6 +197,12 @@ struct ast
         {
             char *value;
         } integer;
+
+        /* AST_STRING */
+        struct
+        {
+            char *value;
+        } string;
 
         /* AST_IDENTIFIER */
         struct

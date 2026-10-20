@@ -1,0 +1,8 @@
+void accept(u8 *bytes) {
+    return;
+}
+
+void entrypoint() {
+    accept("text\n");
+    return;
+}

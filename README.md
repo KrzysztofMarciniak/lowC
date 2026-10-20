@@ -42,7 +42,7 @@ Trail challenge complete! Score: 42 (expected 42)
 
 The lowC source is split across `example/trail/point.lowc`,
 `example/trail/route.lowc`, and `example/trail/main.lowc`. A small C harness
-prints and checks the score because lowC does not have built-in I/O yet.
+prints and checks the score.
 
 Install the compiler as `/usr/local/bin/lowc` (use `sudo` if needed), or choose a different prefix:
 
@@ -394,3 +394,37 @@ Imports are resolved relative to the importing file and can be used for:
 Only the names listed by an import are visible to that source file. Declarations
 in a module remain available within that module, but imports are not re-exported;
 import a dependency directly to use its names from another file.
+
+## Standard library
+
+`make install` also installs public standard-library modules beneath
+`$(PREFIX)/share/lowc/public` (by default,
+`/usr/local/share/lowc/public`). The first module provides string output on
+Linux x86-64:
+
+```c
+#include "/usr/local/share/lowc/public/print.lowc" : "print";
+
+void entrypoint() {
+    print("Hello, World\n");
+}
+```
+
+String literals evaluate to `u8 *` and are stored as read-only byte data. The
+public `print` function calculates their length with the public `strlen`
+helper, so output stops at the first NUL byte. `print` writes to standard
+output via the Linux x86-64 `write` syscall; it has no error return in this
+initial API.
+
+Use `strlen` directly by importing `string.lowc`:
+
+```c
+#include "/usr/local/share/lowc/public/string.lowc" : "strlen";
+
+u64 length() {
+    return strlen("Hello");
+}
+```
+
+Use your configured `PREFIX` in standard-library import paths when it differs
+from `/usr/local`.

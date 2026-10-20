@@ -22,22 +22,23 @@ build/lowc --help
 
 ## 2. Write a first program
 
-Create a file called `hello.lowc`:
+After installing the compiler with `make install`, create a file called
+`hello.lowc`:
 
 ```c
-s64 add(s64 left, s64 right) {
-    return left + right;
-}
+#include "/usr/local/share/lowc/public/print.lowc" : "print";
 
 void entrypoint() {
-    s64 answer = add(20, 22);
+    print("Hello, World\n");
     return;
 }
 ```
 
-The first function returns the sum of its two signed 64-bit parameters. `entrypoint` is where an executable begins; it must take no parameters and return `void`. The local variable shows how to save the result of a function call.
-
-lowC does not have a built-in print function yet, so this small program runs silently. It still demonstrates compilation and execution; the returned value is stored but not displayed.
+`entrypoint` is where an executable begins; it must take no parameters and
+return `void`. The installed `print` module accepts a NUL-terminated `u8 *`
+string and calculates its length internally. Its Linux x86-64 implementation
+writes to standard output. If you installed with a different `PREFIX`, replace
+`/usr/local` in the import path with that prefix.
 
 ## 3. Compile and run it
 

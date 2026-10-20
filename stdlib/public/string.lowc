@@ -1,0 +1,5 @@
+#include "../internal/print/main.lowc" : "__lowc_strlen";
+
+u64 strlen(u8 *data) {
+    return __lowc_strlen(data);
+}

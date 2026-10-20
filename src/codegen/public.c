@@ -238,6 +238,38 @@ codegen_emit_global(
     return 0;
 }
 
+static int
+codegen_emit_write_stdout_runtime(
+    codegen_context *context,
+    ast *function
+)
+{
+    if (
+        strcmp(function->function.return_type, "void") != 0 ||
+        function->function.return_pointer_depth != 0 ||
+        function->function.parameters.count != 2
+    ) {
+        codegen_fail(context, "invalid __lowc_write_stdout declaration");
+        return 1;
+    }
+
+    codegen_output_write(
+        &context->output,
+        ".globl __lowc_write_stdout\n"
+        ".type __lowc_write_stdout, @function\n"
+        "__lowc_write_stdout:\n"
+        "    mov rdx, rsi\n"
+        "    mov rsi, rdi\n"
+        "    mov edi, 1\n"
+        "    mov eax, 1\n"
+        "    syscall\n"
+        "    ret\n"
+        ".size __lowc_write_stdout, .-__lowc_write_stdout\n"
+    );
+
+    return 0;
+}
+
 
 int
 codegen_generate_node(
@@ -294,6 +326,18 @@ codegen_generate_node(
         case AST_FUNCTION:
         {
             codegen_x86_64_context x86_context;
+
+            if (
+                strcmp(
+                    node->function.name,
+                    "__lowc_write_stdout"
+                ) == 0
+            ) {
+                return codegen_emit_write_stdout_runtime(
+                    context,
+                    node
+                );
+            }
 
             /*
              * The generic codegen output buffer remains owned
