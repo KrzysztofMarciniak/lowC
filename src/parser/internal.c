@@ -1095,113 +1095,137 @@ parser_parse_function_or_global(
             return NULL;
         }
 
-        if (!parser_match(
-                state,
-                TOKEN_RPAREN
-            ))
         {
-            do
+            token *first_parameter = parser_current(state);
+
+            if (
+                first_parameter != NULL &&
+                first_parameter->type == TOKEN_RPAREN
+            )
             {
-                char *parameter_type;
-                unsigned long parameter_pointer_depth;
-                token *parameter_name;
-                ast *parameter;
-
-                parameter_type =
-                    parser_parse_type(
-                        state,
-                        &parameter_pointer_depth
-                    );
-
-                if (parameter_type == NULL)
-                {
-                    parser_free(node);
-                    return NULL;
-                }
-
-                parameter_name =
-                    parser_current(state);
-
-                if (parameter_name == NULL)
-                {
-                    parser_set_error(
-                        state,
-                        "expected a parameter name, found end of input."
-                    );
-
-                    free(parameter_type);
-                    parser_free(node);
-                    return NULL;
-                }
-
-                if (parameter_name->type !=
-                    TOKEN_IDENTIFIER)
-                {
-                    parser_set_error(
-                        state,
-                        "expected a parameter name."
-                    );
-
-                    free(parameter_type);
-                    parser_free(node);
-                    return NULL;
-                }
-
-                parameter =
-                    parser_new_node(
-                        AST_PARAMETER,
-                        parameter_name
-                    );
-
-                if (parameter == NULL)
-                {
-                    free(parameter_type);
-                    parser_free(node);
-                    return NULL;
-                }
-
-                parameter->parameter.type =
-                    parameter_type;
-
-                parameter->parameter.pointer_depth =
-                    parameter_pointer_depth;
-
-                parameter->parameter.name =
-                    parser_copy_string(
-                        parameter_name->value
-                    );
-
-                if (parameter->parameter.name == NULL)
-                {
-                    parser_free(parameter);
-                    parser_free(node);
-                    return NULL;
-                }
-
-                parser_advance(state);
-
-                if (!parser_append_ast(
-                        &node->function.parameters,
-                        parameter
-                    ))
-                {
-                    parser_free(parameter);
-                    parser_free(node);
-                    return NULL;
-                }
-
-            } while (parser_match(
-                state,
-                TOKEN_COMMA
-            ));
-
-            if (!parser_expect(
+                parser_set_error(
                     state,
-                    TOKEN_RPAREN
-                ))
-            {
+                    "functions with no parameters must use '(void)'."
+                );
                 parser_free(node);
                 return NULL;
+            }
+
+            if (
+                first_parameter != NULL &&
+                first_parameter->type == TOKEN_VOID &&
+                parser_peek(state, 1) != NULL &&
+                parser_peek(state, 1)->type == TOKEN_RPAREN
+            )
+            {
+                parser_advance(state);
+                parser_advance(state);
+            }
+            else
+            {
+                do
+                {
+                    char *parameter_type;
+                    unsigned long parameter_pointer_depth;
+                    token *parameter_name;
+                    ast *parameter;
+
+                    parameter_type =
+                        parser_parse_type(
+                            state,
+                            &parameter_pointer_depth
+                        );
+
+                    if (parameter_type == NULL)
+                    {
+                        parser_free(node);
+                        return NULL;
+                    }
+
+                    parameter_name =
+                        parser_current(state);
+
+                    if (parameter_name == NULL)
+                    {
+                        parser_set_error(
+                            state,
+                            "expected a parameter name, found end of input."
+                        );
+
+                        free(parameter_type);
+                        parser_free(node);
+                        return NULL;
+                    }
+
+                    if (parameter_name->type !=
+                        TOKEN_IDENTIFIER)
+                    {
+                        parser_set_error(
+                            state,
+                            "expected a parameter name."
+                        );
+
+                        free(parameter_type);
+                        parser_free(node);
+                        return NULL;
+                    }
+
+                    parameter =
+                        parser_new_node(
+                            AST_PARAMETER,
+                            parameter_name
+                        );
+
+                    if (parameter == NULL)
+                    {
+                        free(parameter_type);
+                        parser_free(node);
+                        return NULL;
+                    }
+
+                    parameter->parameter.type =
+                        parameter_type;
+
+                    parameter->parameter.pointer_depth =
+                        parameter_pointer_depth;
+
+                    parameter->parameter.name =
+                        parser_copy_string(
+                            parameter_name->value
+                        );
+
+                    if (parameter->parameter.name == NULL)
+                    {
+                        parser_free(parameter);
+                        parser_free(node);
+                        return NULL;
+                    }
+
+                    parser_advance(state);
+
+                    if (!parser_append_ast(
+                            &node->function.parameters,
+                            parameter
+                        ))
+                    {
+                        parser_free(parameter);
+                        parser_free(node);
+                        return NULL;
+                    }
+
+                } while (parser_match(
+                    state,
+                    TOKEN_COMMA
+                ));
+
+                if (!parser_expect(
+                        state,
+                        TOKEN_RPAREN
+                    ))
+                {
+                    parser_free(node);
+                    return NULL;
+                }
             }
         }
 

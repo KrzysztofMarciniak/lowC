@@ -15,6 +15,7 @@ typedef struct flag_handler_options
     int help;
     int ast;
     int asm_output;
+    int format;
     int tokens;
     int version;
     int optimize;

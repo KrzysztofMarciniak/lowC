@@ -2,7 +2,7 @@ void accept(u8 *bytes) {
     return;
 }
 
-void entrypoint() {
+void entrypoint(void) {
     accept("text\n");
     return;
 }

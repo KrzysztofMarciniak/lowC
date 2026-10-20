@@ -27,6 +27,14 @@ flag_handler_is_asm(
 }
 
 int
+flag_handler_is_format(
+    const char *flag
+)
+{
+    return strcmp(flag, "--format") == 0;
+}
+
+int
 flag_handler_is_tokens(
     const char *flag
 )

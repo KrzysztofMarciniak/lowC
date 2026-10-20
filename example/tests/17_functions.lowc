@@ -2,6 +2,6 @@ s64 add(s64 a, s64 b) {
     return a + b;
 }
 
-s64 main() {
+s64 main(void) {
     return add(10, 20);
 }

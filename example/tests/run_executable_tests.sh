@@ -11,6 +11,105 @@ cleanup() {
 }
 trap cleanup EXIT
 
+cat >"$TEMP_DIR/empty-parameters.lowc" <<'EOF'
+void missing_marker() {
+    return;
+}
+EOF
+
+if "$BIN" --ast "$TEMP_DIR/empty-parameters.lowc" \
+    >"$TEMP_DIR/empty-parameters.out" 2>&1
+then
+    echo "FAIL [parser] accepted a function definition with empty parameters"
+    exit 1
+fi
+
+if ! grep -q "functions with no parameters must use '(void)'" \
+    "$TEMP_DIR/empty-parameters.out"
+then
+    echo "FAIL [parser] missing '(void)' diagnostic"
+    cat "$TEMP_DIR/empty-parameters.out"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/void-parameters.lowc" <<'EOF'
+void no_arguments(void) {
+    return;
+}
+
+void takes_void_pointer(void *pointer) {
+    return;
+}
+
+void entrypoint(void) {
+    no_arguments();
+    return;
+}
+EOF
+
+if ! "$BIN" "$TEMP_DIR/void-parameters.lowc" \
+    -o "$TEMP_DIR/void-parameters" ||
+   ! "$TEMP_DIR/void-parameters"
+then
+    echo "FAIL [parser] explicit void parameter lists were not accepted"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/format-input.lowc" <<'EOF'
+#include "z.lowc" : "z";
+#include "a.lowc" : "a";
+void entrypoint(void){u64 b=2;u64 a=1;if(a){b=b+1;long_name=2;}}
+EOF
+cp "$TEMP_DIR/format-input.lowc" "$TEMP_DIR/format-original.lowc"
+
+if ! "$BIN" --format "$TEMP_DIR/format-input.lowc" \
+    >"$TEMP_DIR/format-stdout"
+then
+    echo "FAIL [format] fixed-style formatter did not run"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/format-expected.lowc" <<'EOF'
+#include "a.lowc" : "a";
+#include "z.lowc" : "z";
+
+void entrypoint(void) {
+        u64 b = 2;
+        u64 a = 1;
+        if (a) {
+                b         = b + 1;
+                long_name = 2;
+        }
+}
+EOF
+
+if [ -s "$TEMP_DIR/format-stdout" ] ||
+   ! cmp -s "$TEMP_DIR/format-input.lowc" "$TEMP_DIR/format-expected.lowc" ||
+   cmp -s "$TEMP_DIR/format-input.lowc" "$TEMP_DIR/format-original.lowc"
+then
+    echo "FAIL [format] source was not overwritten with the fixed style"
+    cat "$TEMP_DIR/format-input.lowc"
+    exit 1
+fi
+
+cp "$TEMP_DIR/format-input.lowc" "$TEMP_DIR/format-before-roundtrip.lowc"
+if ! "$BIN" --format "$TEMP_DIR/format-input.lowc" \
+    >"$TEMP_DIR/format-roundtrip-stdout" ||
+   [ -s "$TEMP_DIR/format-roundtrip-stdout" ] ||
+   ! cmp -s "$TEMP_DIR/format-input.lowc" \
+        "$TEMP_DIR/format-before-roundtrip.lowc"
+then
+    echo "FAIL [format] formatting was not idempotent"
+    exit 1
+fi
+
+if "$BIN" --format --asm "$TEMP_DIR/format-input.lowc" \
+    >"$TEMP_DIR/format-conflict.out" 2>&1
+then
+    echo "FAIL [format] conflicting output modes were accepted"
+    exit 1
+fi
+
 if ! "$BIN" "$SCRIPT_DIR/23_runtime.lowc" \
     -O1 -o "$TEMP_DIR/program with space"
 then
@@ -154,7 +253,7 @@ cat >"$TEMP_DIR/standard-library-print.lowc" <<EOF
 #include "$TEMP_DIR/usr/local/share/lowc/public/print.lowc" : "print";
 #include "$TEMP_DIR/usr/local/share/lowc/public/string.lowc" : "strlen";
 
-void entrypoint() {
+void entrypoint(void) {
     u64 length = strlen("Hello, World\\n");
     print("Hello, World\\n");
 }
@@ -213,7 +312,7 @@ cat >"$TEMP_DIR/standard-library-data.lowc" <<EOF
     "HashMap", "hashmap_init", "hashmap_set", "hashmap_get",
     "hashmap_remove", "hashmap_deinit";
 
-u64 standard_library_data_test() {
+u64 standard_library_data_test(void) {
     u8 *buffer;
     u8 *copy;
     struct HashMap map;
@@ -332,7 +431,7 @@ then
 fi
 
 cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
-u64 invalid_output() {
+u64 invalid_output(void) {
     u64 result;
     asm("nop" : "=rsp"(result) : :);
     return result;
@@ -350,7 +449,7 @@ then
 fi
 
 cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
-void invalid_output_lvalue() {
+void invalid_output_lvalue(void) {
     asm("nop" : "=rax"(42) : :);
 }
 EOF
@@ -366,7 +465,7 @@ then
 fi
 
 cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
-void invalid_input_register() {
+void invalid_input_register(void) {
     asm("nop" : : "foo"(1) :);
 }
 EOF
@@ -382,7 +481,7 @@ then
 fi
 
 cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
-void invalid_placeholder() {
+void invalid_placeholder(void) {
     asm("mov %0, %1" : : :);
 }
 EOF

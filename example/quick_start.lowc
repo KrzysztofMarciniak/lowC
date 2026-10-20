@@ -1,6 +1,6 @@
 #include "../stdlib/public/print.lowc" : "print";
 
-void entrypoint() {
+void entrypoint(void) {
     print("Hello, World\n");
     return;
 }

@@ -7,7 +7,7 @@ s64 add(s64 a, s64 b) {
     return a + b;
 }
 
-void process() {
+void process(void) {
     s64 values[5];
     s64 *ptr;
     struct Point point;
@@ -34,7 +34,7 @@ void process() {
     return;
 }
 
-void entrypoint() {
+void entrypoint(void) {
     process();
     return;
 }

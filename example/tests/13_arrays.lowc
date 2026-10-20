@@ -1,4 +1,4 @@
-s64 main() {
+s64 main(void) {
     s64 values[5];
     values[0] = 10;
     values[1] = 20;

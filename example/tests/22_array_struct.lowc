@@ -3,7 +3,7 @@ s64 x;
 s64 y;
 };
 
-s64 main() {
+s64 main(void) {
 struct Point points[3];
 
 points[0].x = 10;

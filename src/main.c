@@ -13,6 +13,7 @@
 #include "semantic/public.h"
 #include "codegen/public.h"
 #include "output/public.h"
+#include "formatter/public.h"
 
 
 int
@@ -64,6 +65,11 @@ main(
         );
 
         return 1;
+    }
+
+    if (flag_result.options.format)
+    {
+        return formatter_run(files);
     }
 
 

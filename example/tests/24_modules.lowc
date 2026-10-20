@@ -1,18 +1,18 @@
 #include "math.lowc" : "add", "sub";
 #include "module_values.lowc" : "Point", "base", "module_add", "global_point_x";
 
-s64 module_math() {
+s64 module_math(void) {
     return add(10, 20) + sub(30, 10);
 }
 
-s64 module_sum() {
+s64 module_sum(void) {
     struct Point point;
     point.x = base;
     point.y = module_add(22) + global_point_x();
     return point.x + point.y;
 }
 
-void entrypoint() {
+void entrypoint(void) {
     s64 result = module_math() + module_sum();
     return;
 }

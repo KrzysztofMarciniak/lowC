@@ -71,7 +71,10 @@ build/lowc -O1 -o program program.lowc
 build/lowc --asm program.lowc
 ```
 
-Executable output is assembled and linked with the system C compiler driver (`cc` by default; set `CC` to select another driver). Executable programs must define exactly one `void entrypoint()` with no parameters. The compiler supplies the platform `main` wrapper.
+Executable output is assembled and linked with the system C compiler driver
+(`cc` by default; set `CC` to select another driver). Executable programs must
+define exactly one `void entrypoint(void)`. The compiler supplies the platform
+`main` wrapper.
 
 Run the compiler and generated-code checks with:
 
@@ -283,8 +286,12 @@ s64 add(s64 a, s64 b) {
 
 ### Void Functions
 
+Functions that take no parameters must declare `void` in the parameter list.
+Writing an empty parameter list in a function definition is a parser error;
+calls to such functions still use empty parentheses.
+
 ```c
-void foo() {
+void foo(void) {
     return;
 }
 ```
@@ -300,7 +307,7 @@ Every executable program must define exactly one `entrypoint` function.
 `entrypoint` always returns `void` and takes no parameters.
 
 ```c
-void entrypoint() {
+void entrypoint(void) {
     // Program execution begins here.
 }
 ```
@@ -380,7 +387,7 @@ s64 sqrt(s64 x) {
 ```c
 #include "math.lowc" : "add";
 
-void entrypoint() {
+void entrypoint(void) {
     s64 result = add(10, 20);
 }
 ```
@@ -405,7 +412,7 @@ output on Linux x86-64:
 ```c
 #include "/usr/local/share/lowc/public/print.lowc" : "print";
 
-void entrypoint() {
+void entrypoint(void) {
     print("Hello, World\n");
 }
 ```
@@ -423,7 +430,7 @@ Use `strlen` directly by importing `string.lowc`:
     "strlen", "strcmp", "strcpy", "strcat", "strdup";
 #include "/usr/local/share/lowc/public/memory.lowc" : "dealloc";
 
-u64 string_example() {
+u64 string_example(void) {
     u8 *copy = strdup("Hello");
     u64 length = strlen(copy);
     dealloc(copy);
@@ -441,7 +448,7 @@ The `memory.lowc` module provides Linux x86-64 `mmap`-backed allocations:
 ```c
 #include "/usr/local/share/lowc/public/memory.lowc" : "alloc", "dealloc";
 
-u1 allocation_example() {
+u1 allocation_example(void) {
     u8 *buffer = alloc(128);
     buffer[0] = 42;
     return dealloc(buffer);
@@ -463,7 +470,7 @@ whether the key existed:
     "HashMap", "hashmap_init", "hashmap_set",
     "hashmap_get", "hashmap_remove", "hashmap_deinit";
 
-u1 hashmap_example() {
+u1 hashmap_example(void) {
     struct HashMap map;
     u64 value;
 
@@ -484,6 +491,32 @@ allocations. Do not use the map after deinitializing it.
 
 Use your configured `PREFIX` in standard-library import paths when it differs
 from `/usr/local`.
+
+## Formatting
+
+`lowc --format file.lowc` overwrites the input file with formatted source. It
+requires `clang-format` in `PATH` and always uses this fixed style; it does not
+read `.clang-format` or accept style overrides:
+
+```yaml
+BasedOnStyle: Google
+IndentWidth: 8
+ColumnLimit: 80
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+AlignConsecutiveAssignments: true
+SortIncludes: true
+SpacesBeforeTrailingComments: 0
+AlwaysBreakTemplateDeclarations: false
+SpaceAfterCStyleCast: false
+DerivePointerAlignment: false
+PointerAlignment: Left
+SeparateDefinitionBlocks: Always
+UseTab: Never
+```
+
+Formatting cannot be combined with `--tokens`, `--ast`, `--asm`, `-O1`, or
+`-o`.
 
 ## Inline assembly
 

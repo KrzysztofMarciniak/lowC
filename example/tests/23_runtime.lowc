@@ -2,11 +2,11 @@ s64 add(s64 left, s64 right) {
     return left + right;
 }
 
-s64 nested() {
+s64 nested(void) {
     return 100 + add(20, 22);
 }
 
-s64 folded() {
+s64 folded(void) {
     return (2 + 3) * 4;
 }
 
@@ -15,21 +15,21 @@ struct Point {
     s64 y;
 };
 
-s64 point_sum() {
+s64 point_sum(void) {
     struct Point point;
     point.x = 10;
     point.y = 32;
     return point.x + point.y;
 }
 
-s64 byte_array_sum() {
+s64 byte_array_sum(void) {
     u8 values[3];
     values[0] = 20;
     values[1] = 22;
     return values[0] + values[1];
 }
 
-s64 pointer_member_sum() {
+s64 pointer_member_sum(void) {
     struct Point point;
     struct Point *pointer;
     pointer = &point;
@@ -38,14 +38,14 @@ s64 pointer_member_sum() {
     return pointer->x + pointer->y;
 }
 
-s64 struct_array_sum() {
+s64 struct_array_sum(void) {
     struct Point points[2];
     points[0].x = 20;
     points[1].y = 22;
     return points[0].x + points[1].y;
 }
 
-s64 pointer_arithmetic() {
+s64 pointer_arithmetic(void) {
     s64 values[2];
     s64 *pointer;
     pointer = &values[0];
@@ -53,7 +53,7 @@ s64 pointer_arithmetic() {
     return values[1];
 }
 
-void entrypoint() {
+void entrypoint(void) {
     add(1, 2);
     return;
 }

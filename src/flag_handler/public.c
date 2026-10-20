@@ -25,6 +25,7 @@ flag_handler(
         .help = 0,
         .ast = 0,
         .asm_output = 0,
+        .format = 0,
         .tokens = 0,
         .version = 0,
         .optimize = 0,
@@ -52,6 +53,12 @@ flag_handler(
 
         if (flag_handler_is_asm(flag)) {
             options.asm_output = 1;
+            options.executable = 0;
+            continue;
+        }
+
+        if (flag_handler_is_format(flag)) {
+            options.format = 1;
             options.executable = 0;
             continue;
         }
@@ -98,6 +105,21 @@ flag_handler(
         }
 
         return flag_handler_error("unknown flag");
+    }
+
+    if (
+        options.format &&
+        (
+            options.ast ||
+            options.asm_output ||
+            options.tokens ||
+            options.optimize ||
+            options.output_path != NULL
+        )
+    ) {
+        return flag_handler_error(
+            "--format cannot be combined with other output modes, -O1, or -o"
+        );
     }
 
     return (flag_handler_result) {
@@ -152,6 +174,7 @@ flag_handler_print_help(
         "  --tokens            Print lexer tokens.\n"
         "  --ast               Print the parsed abstract syntax tree.\n"
         "  --asm               Print assembly output instead of building an executable.\n"
+        "  --format            Format source files in place (requires clang-format).\n"
         "  -o <path>           Write the executable to <path> (default: a.out).\n"
         "  -O1                 Enable lightweight assembly optimizations.\n"
         "\n"
@@ -163,9 +186,11 @@ flag_handler_print_help(
         "  %s --tokens program.lowc\n"
         "  %s --ast program.lowc\n"
         "  %s --asm program.lowc\n"
+        "  %s --format program.lowc\n"
         "  %s -O1 -o program program.lowc\n"
         "  %s --target=x86_64 program.lowc\n"
         "\n",
+        program,
         program,
         program,
         program,

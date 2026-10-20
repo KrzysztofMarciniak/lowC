@@ -1,26 +1,26 @@
-u64 inline_assembly_move() {
+u64 inline_assembly_move(void) {
     u64 result;
     asm("mov %0, %1" : "=rax"(result) : "rdi"(42) : );
     return result;
 }
 
-u64 inline_assembly_syscall_pid() {
+u64 inline_assembly_syscall_pid(void) {
     u64 result;
     asm("syscall" : "=rax"(result) : "rax"(39) : "rcx", "r11");
     return result;
 }
 
-u64 inline_assembly_callee_saved() {
+u64 inline_assembly_callee_saved(void) {
     u64 result;
     asm("mov %0, 17" : "=rbx"(result) : :);
     return result;
 }
 
-u64 inline_assembly_call_target() {
+u64 inline_assembly_call_target(void) {
     return 23;
 }
 
-u64 inline_assembly_call() {
+u64 inline_assembly_call(void) {
     u64 result;
     asm(
         "call inline_assembly_call_target\nmov %0, rax"

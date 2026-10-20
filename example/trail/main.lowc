@@ -7,7 +7,7 @@ s64 point_value(s64 x, s64 y) {
     return x * 2 + y;
 }
 
-s64 calculate_score() {
+s64 calculate_score(void) {
     struct Point stops[3];
     stops[0].x = 2;
     stops[0].y = 1;
@@ -40,11 +40,11 @@ s64 calculate_score() {
     }
 }
 
-void entrypoint() {
+void entrypoint(void) {
     final_score = calculate_score();
     return;
 }
 
-s64 read_score() {
+s64 read_score(void) {
     return final_score;
 }

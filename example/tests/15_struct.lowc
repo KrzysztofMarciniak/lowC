@@ -3,7 +3,7 @@ struct Point {
     s64 y;
 };
 
-s64 main() {
+s64 main(void) {
     struct Point p;
     p.x = 10;
     p.y = 20;

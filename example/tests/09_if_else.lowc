@@ -1,4 +1,4 @@
-s64 main() {
+s64 main(void) {
     s64 x = 10;
     if (x > 20) {
         x = 30;

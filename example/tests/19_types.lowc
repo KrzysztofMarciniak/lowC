@@ -1,4 +1,4 @@
-void test_unsigned() {
+void test_unsigned(void) {
     u1 a = 1;
     u2 b = 2;
     u4 c = 4;
@@ -9,7 +9,7 @@ void test_unsigned() {
     return;
 }
 
-void test_signed() {
+void test_signed(void) {
     s1 a = 1;
     s2 b = 2;
     s4 c = 4;

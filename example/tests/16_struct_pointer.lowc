@@ -3,7 +3,7 @@ struct Point {
     s64 y;
 };
 
-void entrypoint() {
+void entrypoint(void) {
     struct Point p;
     struct Point *ptr;
     ptr = &p;

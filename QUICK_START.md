@@ -28,7 +28,7 @@ After installing the compiler with `make install`, create a file called
 ```c
 #include "/usr/local/share/lowc/public/print.lowc" : "print";
 
-void entrypoint() {
+void entrypoint(void) {
     print("Hello, World\n");
     return;
 }
@@ -139,7 +139,7 @@ Every `.lowc` file can be imported. For example, if `math.lowc` defines `add`, a
 ```c
 #include "math.lowc" : "add";
 
-void entrypoint() {
+void entrypoint(void) {
     s64 result = add(20, 22);
     return;
 }

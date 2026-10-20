@@ -12,7 +12,7 @@ s64 module_add(s64 value) {
     return point.x + point.y;
 }
 
-s64 global_point_x() {
+s64 global_point_x(void) {
     base = base + 1;
     return base;
 }
