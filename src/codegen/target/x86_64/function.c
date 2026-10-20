@@ -23,6 +23,60 @@ static const char *argument_registers[] =
     "r9"
 };
 
+static const char *argument_registers_1_byte[] =
+{
+    "dil",
+    "sil",
+    "dl",
+    "cl",
+    "r8b",
+    "r9b"
+};
+
+static const char *argument_registers_2_bytes[] =
+{
+    "di",
+    "si",
+    "dx",
+    "cx",
+    "r8w",
+    "r9w"
+};
+
+static const char *argument_registers_4_bytes[] =
+{
+    "edi",
+    "esi",
+    "edx",
+    "ecx",
+    "r8d",
+    "r9d"
+};
+
+static const char *
+argument_register_for_size(
+    unsigned long index,
+    unsigned long size
+)
+{
+    switch (size) {
+        case 1:
+            return argument_registers_1_byte[index];
+
+        case 2:
+            return argument_registers_2_bytes[index];
+
+        case 4:
+            return argument_registers_4_bytes[index];
+
+        case 8:
+            return argument_registers[index];
+
+        default:
+            return NULL;
+    }
+}
+
 
 /*
  * Round a value up to the requested alignment.
@@ -387,18 +441,23 @@ emit_parameters(
         }
 
 
-        register_name =
-            argument_registers[i];
-
-
         operand_size =
             codegen_x86_64_type_operand_size(
                 parameter->parameter.type,
                 parameter->parameter.pointer_depth
             );
 
+        register_name =
+            argument_register_for_size(
+                i,
+                codegen_x86_64_type_size(
+                    parameter->parameter.type,
+                    parameter->parameter.pointer_depth
+                )
+            );
 
-        if (!operand_size){
+
+        if (!operand_size || !register_name){
             return;
         }
 

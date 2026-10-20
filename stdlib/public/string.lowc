@@ -5,6 +5,70 @@ u64 strlen(u8 *data) {
     return __lowc_strlen(data);
 }
 
+u1 parse_u64(u8 *text, u64 *result) {
+    u8 *maximum;
+    u64 length;
+    u64 first_significant;
+    u64 significant_length;
+    u64 index;
+    u64 parsed;
+    s64 comparison;
+
+    maximum = "18446744073709551615";
+    length = 0;
+
+    for (; text[length] != 0; length = length + 1) {
+        if (text[length] < 48 || text[length] > 57) {
+            return 0;
+        }
+    }
+
+    if (length == 0) {
+        return 0;
+    }
+
+    first_significant = 0;
+    for (
+        ;
+        first_significant < length && text[first_significant] == 48;
+        first_significant = first_significant + 1
+    ) {
+    }
+
+    significant_length = length - first_significant;
+    if (significant_length > 20) {
+        return 0;
+    }
+
+    if (significant_length == 20) {
+        comparison = 0;
+
+        for (index = 0; index < 20; index = index + 1) {
+            if (comparison == 0) {
+                if (text[first_significant + index] > maximum[index]) {
+                    comparison = 1;
+                }
+
+                if (text[first_significant + index] < maximum[index]) {
+                    comparison = -1;
+                }
+            }
+        }
+
+        if (comparison > 0) {
+            return 0;
+        }
+    }
+
+    parsed = 0;
+    for (index = 0; index < length; index = index + 1) {
+        parsed = parsed * 10 + (text[index] - 48);
+    }
+
+    *result = parsed;
+    return 1;
+}
+
 s64 strcmp(u8 *left, u8 *right) {
     u64 index;
 

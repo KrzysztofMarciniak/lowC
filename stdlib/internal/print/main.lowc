@@ -17,3 +17,52 @@ void __lowc_write_stdout(u8 *data, u64 length) {
 
     return;
 }
+
+void __lowc_print_u64(u64 value) {
+    u8 digits[20];
+    u64 index;
+    u64 quotient;
+    u64 remainder;
+
+    index = 20;
+
+    if (value == 0) {
+        index = 19;
+        digits[index] = 48;
+    }
+
+    for (; value != 0; ) {
+        asm(
+            "xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
+            : "=rax"(quotient)
+            : "rax"(value), "rsi"(10), "rdi"(&remainder)
+            : "rdx", "memory", "cc"
+        );
+
+        index = index - 1;
+        digits[index] = 48 + remainder;
+        value = quotient;
+    }
+
+    __lowc_write_stdout(&digits[index], 20 - index);
+    return;
+}
+
+void __lowc_print_s64(s64 value) {
+    u64 magnitude;
+
+    if (value < 0) {
+        __lowc_write_stdout("-", 1);
+        asm(
+            "neg rax"
+            : "=rax"(magnitude)
+            : "rax"(value)
+            : "cc"
+        );
+    } else {
+        magnitude = value;
+    }
+
+    __lowc_print_u64(magnitude);
+    return;
+}

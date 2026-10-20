@@ -423,11 +423,27 @@ helper, so output stops at the first NUL byte. `print` writes to standard
 output via the Linux x86-64 `write` syscall; it has no error return in this
 initial API.
 
+`print_u1`, `print_u2`, `print_u4`, `print_u8`, `print_u16`, `print_u32`, and
+`print_u64` print unsigned integers in decimal. `print_s1`, `print_s2`,
+`print_s4`, `print_s8`, `print_s16`, `print_s32`, and `print_s64` do the same
+for signed integers. Numeric print functions do not add a newline:
+
+```c
+#include "/usr/local/share/lowc/public/print.lowc" :
+    "print_u64", "print_s64", "print";
+
+void entrypoint(void) {
+    print_u64(42);
+    print_s64(-7);
+    print("\n");
+}
+```
+
 Use `strlen` directly by importing `string.lowc`:
 
 ```c
 #include "/usr/local/share/lowc/public/string.lowc" :
-    "strlen", "strcmp", "strcpy", "strcat", "strdup";
+    "strlen", "parse_u64", "strcmp", "strcpy", "strcat", "strdup";
 #include "/usr/local/share/lowc/public/memory.lowc" : "dealloc";
 
 u64 string_example(void) {
@@ -437,6 +453,11 @@ u64 string_example(void) {
     return length;
 }
 ```
+
+`parse_u64(text, &value)` returns true for a non-empty sequence of decimal
+digits that fits in `u64`, and writes the parsed value only on success. It
+accepts leading zeroes but rejects signs, whitespace, other characters, and
+overflow.
 
 `strcmp` returns a negative value, zero, or a positive value for less-than,
 equal, or greater-than strings. `strcpy` and `strcat` return the destination;
