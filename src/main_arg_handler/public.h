@@ -13,6 +13,8 @@ typedef struct files
 {
     int count;
     char **values;
+    int c_source_count;
+    char **c_sources;
 } files;
 
 

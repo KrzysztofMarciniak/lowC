@@ -317,38 +317,41 @@ Unlike C, lowC does not use `main()` as the program entrypoint.
 
 ### Calling C functions
 
-Declare a C function with a `foreign c` prototype. The compiler checks calls
-against the prototype and emits a call to the matching C symbol; it does not
-parse C headers or compile C source files:
+Call the C library's `printf` directly:
 
 ```c
-foreign c s4 puts(u1 *text);
+foreign c s4 printf(u1 *format, u1 *text);
 
 void entrypoint(void) {
-    puts("Hello from C");
+    printf("Hello, %s!\n", "World");
     return;
 }
 ```
 
-Compile C sources separately into a library or object file, then pass its
-library search path and name to lowC:
+Build as usual; the default C driver links the C standard library:
 
 ```sh
-build/lowc -foreign c=cc -L/path/to/libraries -lmylibrary \
-    -o program program.lowc
+build/lowc -o hello hello.lowc
 ```
 
-`-foreign <language>=<driver>` selects the assembler/linker driver for that
-foreign language; for example, `-foreign c=clang`. If no C driver is specified,
-lowC uses `CC`, or `cc` by default. `-L<path>` and `-l<name>` are passed to that
-driver. The mapping syntax is generic, but only the C ABI is currently
-supported.
+The `foreign c` declaration gives lowC the fixed argument types used here.
+General variadic calls, such as passing floating-point values to `printf`, are
+not supported.
 
-The current C ABI support targets x86-64 System V and accepts fixed-argument
-integer and pointer parameters/results, up to six parameters. C declarations
-must use compatible byte-width types (`u1`/`s1` through `u8`/`s8`) and pointer
-types. Structs passed or returned by value, variadic functions, and automatic
-C-header parsing are not supported.
+For your own C function, declare its signature with `foreign c` and pass the
+`.c` file on the same command line. lowC compiles and links it for you:
+
+```sh
+build/lowc -o hello hello.lowc helper.c
+```
+
+Prebuilt libraries can still be linked with `-L<path>` and `-l<name>`. Use
+`-foreign c=clang` to select a different driver; by default lowC uses `CC` or
+`cc`.
+
+Foreign declarations currently support the x86-64 System V C ABI, fixed
+integer and pointer arguments/results, and up to six parameters. Structs passed
+or returned by value and automatic C-header parsing are not supported.
 
 ---
 

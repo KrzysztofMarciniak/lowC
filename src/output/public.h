@@ -13,7 +13,8 @@ typedef struct output_result
 output_result
 output(
     codegen_result codegen,
-    flag_handler_options *options
+    flag_handler_options *options,
+    files *input_files
 );
 
 void

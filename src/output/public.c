@@ -43,7 +43,8 @@ static output_result
 output_build_executable(
     const char *assembly,
     const char *output_path,
-    const flag_handler_options *options
+    const flag_handler_options *options,
+    const files *input_files
 )
 {
     char temporary_path[] = "/tmp/lowc-XXXXXX";
@@ -51,6 +52,7 @@ output_build_executable(
     char **compiler_arguments;
     size_t argument_index;
     size_t argument_count;
+    size_t c_source_argument_count;
     size_t remaining;
     const char *cursor;
     int descriptor;
@@ -95,8 +97,14 @@ output_build_executable(
         compiler = "cc";
     }
 
+    c_source_argument_count =
+        input_files->c_source_count == 0
+            ? 0
+            : 2 + (size_t)input_files->c_source_count;
     argument_count =
-        7 + (size_t)options->linker_argument_count;
+        7 +
+        (size_t)options->linker_argument_count +
+        c_source_argument_count;
     compiler_arguments = calloc(
         argument_count,
         sizeof(*compiler_arguments)
@@ -113,6 +121,18 @@ output_build_executable(
     compiler_arguments[4] = "-o";
     compiler_arguments[5] = (char *)output_path;
     argument_index = 6;
+    if (input_files->c_source_count > 0) {
+        compiler_arguments[argument_index++] = "-x";
+        compiler_arguments[argument_index++] = "c";
+        for (
+            int index = 0;
+            index < input_files->c_source_count;
+            index++
+        ) {
+            compiler_arguments[argument_index++] =
+                input_files->c_sources[index];
+        }
+    }
     for (
         int index = 0;
         index < options->linker_argument_count;
@@ -156,7 +176,8 @@ output_build_executable(
 output_result
 output(
     codegen_result codegen,
-    flag_handler_options *options
+    flag_handler_options *options,
+    files *input_files
 )
 {
     output_result result = {
@@ -177,6 +198,15 @@ output(
         result.error = 1;
         result.error_text =
             output_strdup("missing compiler options");
+
+        return result;
+    }
+
+    if (input_files == NULL)
+    {
+        result.error = 1;
+        result.error_text =
+            output_strdup("missing input files");
 
         return result;
     }
@@ -203,7 +233,8 @@ output(
         options->output_path != NULL
             ? options->output_path
             : "a.out",
-        options
+        options,
+        input_files
     );
 }
 

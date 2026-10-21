@@ -181,6 +181,49 @@ then
     exit 1
 fi
 
+cat >"$TEMP_DIR/direct-helper.c" <<'EOF'
+#include <stdint.h>
+
+uint64_t lowc_direct_add(uint64_t left, uint64_t right)
+{
+    return left + right;
+}
+EOF
+
+cat >"$TEMP_DIR/direct-caller.lowc" <<'EOF'
+foreign c u8 lowc_direct_add(u8 left, u8 right);
+foreign c s4 puts(u1 *text);
+
+void entrypoint(void) {
+    if (lowc_direct_add(20, 22) == 42) {
+        puts("Direct C source works");
+    }
+    return;
+}
+EOF
+
+if ! "$BIN" \
+    "$TEMP_DIR/direct-helper.c" \
+    "$TEMP_DIR/direct-caller.lowc" \
+    -o "$TEMP_DIR/direct-caller" ||
+   ! "$TEMP_DIR/direct-caller" >"$TEMP_DIR/direct-caller.out" ||
+   ! printf 'Direct C source works\n' \
+        | cmp -s - "$TEMP_DIR/direct-caller.out"
+then
+    echo "FAIL [foreign C] direct C source compilation failed"
+    cat "$TEMP_DIR/direct-caller.out"
+    exit 1
+fi
+
+if "$BIN" --asm \
+    "$TEMP_DIR/direct-caller.lowc" \
+    "$TEMP_DIR/direct-helper.c" \
+    >"$TEMP_DIR/direct-asm.out" 2>&1
+then
+    echo "FAIL [foreign C] C source was accepted with --asm"
+    exit 1
+fi
+
 cat >"$TEMP_DIR/unsupported-foreign.lowc" <<'EOF'
 foreign forth u8 unsupported(void);
 void entrypoint(void) {

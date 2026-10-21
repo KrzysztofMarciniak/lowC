@@ -1,6 +1,6 @@
-#include "../stdlib/public/print.lowc" : "print";
+foreign c s4 printf(u1 *format, u1 *text);
 
 void entrypoint(void) {
-    print("Hello, World\n");
+    printf("Hello, %s\n", "World");
     return;
 }

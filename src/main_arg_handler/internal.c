@@ -20,6 +20,20 @@ main_arg_handler_is_flag(
     return 1;
 }
 
+static int
+main_arg_handler_is_c_source(
+    const char *path
+)
+{
+    size_t length;
+
+    if (path == NULL)
+        return 0;
+
+    length = strlen(path);
+    return length >= 2 && strcmp(path + length - 2, ".c") == 0;
+}
+
 
 static void
 main_arg_handler_rotate(
@@ -46,16 +60,19 @@ main_arg_handler_split(
     int argc,
     char **argv,
     int *flag_count,
-    int *file_count
+    int *file_count,
+    int *c_source_count
 )
 {
     int position;
     int flag_position;
     int end_of_flags;
+    int lowc_position;
 
 
     *flag_count = 0;
     *file_count = 0;
+    *c_source_count = 0;
 
     flag_position = 1;
     end_of_flags = 0;
@@ -141,7 +158,24 @@ main_arg_handler_split(
         }
 
 
-        (*file_count)++;
+        if (main_arg_handler_is_c_source(argument)) {
+            (*c_source_count)++;
+        } else {
+            (*file_count)++;
+        }
+    }
+
+    lowc_position = 1 + *flag_count;
+    for (position = lowc_position; position < argc; position++)
+    {
+        if (!main_arg_handler_is_c_source(argv[position])) {
+            main_arg_handler_rotate(
+                argv,
+                lowc_position,
+                position
+            );
+            lowc_position++;
+        }
     }
 }
 
@@ -159,6 +193,7 @@ main_arg_handler_internal(
 
     int flag_count;
     int file_count;
+    int c_source_count;
     int end_of_flags;
 
     if (argc < 1 || argv == 0)
@@ -224,13 +259,16 @@ main_arg_handler_internal(
 
     files_result.count = 0;
     files_result.values = 0;
+    files_result.c_source_count = 0;
+    files_result.c_sources = 0;
 
 
     main_arg_handler_split(
         argc,
         argv,
         &flag_count,
-        &file_count
+        &file_count,
+        &c_source_count
     );
 
 
@@ -241,9 +279,13 @@ main_arg_handler_internal(
 
 
     files_result.count = file_count;
+    files_result.c_source_count = c_source_count;
 
     if (file_count > 0)
         files_result.values = &argv[1 + flag_count];
+    if (c_source_count > 0)
+        files_result.c_sources =
+            &argv[1 + flag_count + file_count];
 
 
     *flags = &flags_result;

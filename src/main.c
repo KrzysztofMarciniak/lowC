@@ -69,6 +69,23 @@ main(
         return 1;
     }
 
+    if (
+        files->c_source_count > 0 &&
+        (
+            flag_result.options.asm_output ||
+            flag_result.options.ast ||
+            flag_result.options.tokens ||
+            flag_result.options.format
+        )
+    ) {
+        fprintf(
+            stderr,
+            "C source files can only be used when building an executable.\n"
+        );
+        flag_handler_options_free(&flag_result.options);
+        return 1;
+    }
+
     if (flag_result.options.format)
     {
         int format_result = formatter_run(files);
@@ -152,7 +169,8 @@ main(
     output_result output_result =
         output(
             codegen_result,
-            &flag_result.options
+            &flag_result.options,
+            files
         );
 
     if (output_result.error)

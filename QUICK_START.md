@@ -22,23 +22,20 @@ build/lowc --help
 
 ## 2. Write a first program
 
-After installing the compiler with `make install`, create a file called
-`hello.lowc`:
+Create a file called `hello.lowc`:
 
 ```c
-#include "/usr/local/share/lowc/public/print.lowc" : "print";
+foreign c s4 printf(u1 *format, u1 *text);
 
 void entrypoint(void) {
-    print("Hello, World\n");
+    printf("Hello, %s\n", "World");
     return;
 }
 ```
 
 `entrypoint` is where an executable begins; it must take no parameters and
-return `void`. The installed `print` module accepts a NUL-terminated `u1 *`
-string and calculates its length internally. Its Linux x86-64 implementation
-writes to standard output. If you installed with a different `PREFIX`, replace
-`/usr/local` in the import path with that prefix.
+return `void`. The `foreign c` declaration describes the C function signature;
+the default C compiler driver links `printf` from the standard library.
 
 ## 3. Compile and run it
 
