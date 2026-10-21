@@ -545,6 +545,70 @@ then
     exit 1
 fi
 
+cat >"$TEMP_DIR/standard-library-args.lowc" <<EOF
+#include "$TEMP_DIR/usr/local/share/lowc/public/args.lowc" :
+    "args_count", "args_get";
+#include "$TEMP_DIR/usr/local/share/lowc/public/print.lowc" :
+    "print", "print_u64";
+
+void entrypoint(void) {
+    u64 count;
+    u8 *argument;
+
+    count = args_count();
+    print_u64(count);
+    print("|");
+
+    if (args_get(0, &argument)) {
+        print(argument);
+    } else {
+        print("missing");
+    }
+    print("|");
+
+    if (args_get(1, &argument)) {
+        print(argument);
+    } else {
+        print("missing");
+    }
+    print("|");
+
+    if (args_get(2, &argument)) {
+        print(argument);
+    } else {
+        print("missing");
+    }
+    print("|");
+
+    argument = "unchanged";
+    if (args_get(count, &argument)) {
+        print("unexpected");
+    }
+    print(argument);
+    print("\\n");
+}
+EOF
+
+for mode in unoptimized optimized; do
+    if [ "$mode" = optimized ]; then
+        optimization=-O1
+    else
+        optimization=
+    fi
+
+    if ! "$BIN" "$TEMP_DIR/standard-library-args.lowc" $optimization \
+        -o "$TEMP_DIR/args-$mode" ||
+       ! "$TEMP_DIR/args-$mode" alpha "two words" \
+            >"$TEMP_DIR/args-$mode.out" ||
+       ! printf '3|%s|alpha|two words|unchanged\n' "$TEMP_DIR/args-$mode" \
+            | cmp -s - "$TEMP_DIR/args-$mode.out"
+    then
+        echo "FAIL [standard library] $mode command-line argument access was incorrect"
+        cat "$TEMP_DIR/args-$mode.out"
+        exit 1
+    fi
+done
+
 cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
 u64 invalid_output(void) {
     u64 result;
@@ -615,4 +679,5 @@ echo "ok   [modules] imported functions, structs, and globals assemble, link, an
 echo "ok   [modules] unimported functions, structs, and globals are rejected"
 echo "ok   [executable] optimized and unoptimized output assembles, links, and runs"
 echo "ok   [standard library] installed print module writes exact output"
+echo "ok   [standard library] CLI arguments include argv[0] and are bounds checked"
 echo "ok   [inline assembly] register operands, syscall, clobbers, and validation work"

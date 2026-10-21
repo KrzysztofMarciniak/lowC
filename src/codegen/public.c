@@ -238,6 +238,77 @@ codegen_emit_global(
     return 0;
 }
 
+static ast *
+codegen_find_global(
+    ast *program,
+    const char *name
+)
+{
+    unsigned long i;
+
+    for (i = 0; i < program->program.globals.count; i++) {
+        ast *global = program->program.globals.values[i];
+
+        if (strcmp(global->variable.name, name) == 0) {
+            return global;
+        }
+    }
+
+    return NULL;
+}
+
+static int
+codegen_emit_process_args_bridge(
+    codegen_context *context,
+    ast *program
+)
+{
+    ast *argc_global;
+    ast *argv_global;
+
+    argc_global = codegen_find_global(
+        program,
+        "__lowc_args_argc"
+    );
+    argv_global = codegen_find_global(
+        program,
+        "__lowc_args_argv"
+    );
+
+    if (!argc_global && !argv_global) {
+        return 0;
+    }
+
+    if (
+        !argc_global ||
+        !argv_global ||
+        strcmp(argc_global->variable.type, "u64") != 0 ||
+        argc_global->variable.pointer_depth != 0 ||
+        argc_global->variable.array_length != NULL ||
+        argc_global->variable.value != NULL ||
+        strcmp(argv_global->variable.type, "u8") != 0 ||
+        argv_global->variable.pointer_depth != 2 ||
+        argv_global->variable.array_length != NULL ||
+        argv_global->variable.value != NULL
+    ) {
+        codegen_fail(
+            context,
+            "invalid declarations for command-line argument runtime state"
+        );
+        return 1;
+    }
+
+    codegen_output_write(
+        &context->output,
+        "    mov edi, edi\n"
+        "    mov [rip+__lowc_args_argc], rdi\n"
+        "    mov [rip+__lowc_args_argv], rsi\n"
+    );
+
+    return 0;
+}
+
+
 int
 codegen_generate_node(
     codegen_context *context,
@@ -407,6 +478,14 @@ codegen_generate_program(
         ".type main, @function\n"
         "main:\n"
         "    sub rsp, 8\n"
+    );
+
+    if (codegen_emit_process_args_bridge(context, tree)) {
+        return 1;
+    }
+
+    codegen_output_write(
+        &context->output,
         "    call entrypoint\n"
         "    add rsp, 8\n"
     );

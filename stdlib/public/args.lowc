@@ -1,0 +1,15 @@
+u64 __lowc_args_argc;
+u8 **__lowc_args_argv;
+
+u64 args_count(void) {
+    return __lowc_args_argc;
+}
+
+u1 args_get(u64 index, u8 **value) {
+    if (index >= __lowc_args_argc) {
+        return 0;
+    }
+
+    *value = __lowc_args_argv[index];
+    return 1;
+}

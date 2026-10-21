@@ -417,6 +417,40 @@ void entrypoint(void) {
 }
 ```
 
+The `args.lowc` module exposes the process command-line arguments while
+preserving the required `void entrypoint(void)` signature:
+
+```c
+#include "/usr/local/share/lowc/public/args.lowc" :
+    "args_count", "args_get";
+#include "/usr/local/share/lowc/public/print.lowc" :
+    "print", "print_u64";
+
+void entrypoint(void) {
+    u64 count = args_count();
+    u64 index;
+    u8 *argument;
+
+    print("args count = ");
+    print_u64(count);
+    print("\n");
+
+    for (index = 0; index < count; index = index + 1) {
+        if (args_get(index, &argument)) {
+            print(argument);
+            print("\n");
+        }
+    }
+}
+```
+
+`args_count()` includes the executable path, so `args_get(0, &argument)`
+retrieves `argv[0]`; subsequent indices are the arguments in order.
+`args_get` returns false for an out-of-range index and leaves the output
+pointer unchanged. Returned strings are borrowed, NUL-terminated process
+arguments: do not modify or deallocate them. The startup bridge currently
+supports Linux x86-64.
+
 String literals evaluate to `u8 *` and are stored as read-only byte data. The
 public `print` function calculates their length with the public `strlen`
 helper, so output stops at the first NUL byte. `print` writes to standard
