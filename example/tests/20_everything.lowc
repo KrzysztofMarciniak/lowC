@@ -8,9 +8,9 @@ s8 add(s8 a, s8 b) {
 }
 
 void process(void) {
-    s8 values[5];
-    s8 *ptr;
-    struct Point point;
+    s8 values[5] = 0;
+    s8 *ptr = 0;
+    struct Point point = 0;
 
     values[0] = 10;
     values[1] = 20;

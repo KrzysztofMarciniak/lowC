@@ -58,7 +58,7 @@ lowC has signed and unsigned integers whose type suffix gives the size in
 bytes. Supported sizes are 1, 2, 4, and 8 bytes, with 8 bytes as the maximum:
 
 ```c
-s1 small_signed;
+s1 small_signed = 0;
 u4 count = 3;
 s8 total = 40;
 ```
@@ -97,7 +97,7 @@ for (s8 i = 0; i < 3; i = i + 1) {
 Array indexing works directly:
 
 ```c
-s8 values[3];
+s8 values[3] = 0;
 values[0] = 10;
 values[1] = 20;
 ```
@@ -105,7 +105,7 @@ values[1] = 20;
 Arrays do not implicitly convert to pointers. Take an element's address explicitly:
 
 ```c
-s8 *pointer;
+s8 *pointer = 0;
 pointer = &values[0];
 *pointer = *pointer + 1;
 ```
@@ -120,11 +120,11 @@ struct Point {
     s8 y;
 };
 
-struct Point point;
+struct Point point = 0;
 point.x = 10;
 point.y = 20;
 
-struct Point *point_pointer;
+struct Point *point_pointer = 0;
 point_pointer = &point;
 point_pointer->x = 30;
 ```

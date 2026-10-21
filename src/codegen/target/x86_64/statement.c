@@ -5,7 +5,19 @@
 #include "../../output.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+static int
+codegen_x86_64_zero_initializer(
+    const ast *expression
+)
+{
+    return
+        expression != NULL &&
+        expression->type == AST_INTEGER &&
+        strtoull(expression->integer.value, NULL, 10) == 0;
+}
 
 
 /*
@@ -1325,29 +1337,45 @@ codegen_x86_64_statement(
              */
             if (statement->variable.value && local){
 
-                /*
-                 * ----------------------------------------------------
-                 * local variable initializer
-                 * ----------------------------------------------------
-                 *
-                 * source:
-                 *
-                 *     <type> <name> = <value>;
-                 */
-                codegen_x86_64_expression(
-                    context,
-                    statement->variable.value
-                );
+                int is_aggregate =
+                    local->array_count != 0 ||
+                    (
+                        local->pointer_depth == 0 &&
+                        codegen_x86_64_type_size(
+                            local->type,
+                            0
+                        ) == 0
+                    );
 
+                if (
+                    is_aggregate &&
+                    codegen_x86_64_zero_initializer(
+                        statement->variable.value
+                    )
+                ) {
+                    codegen_output_printf(
+                        context->output,
+                        "    lea rdi, [rbp%+ld]\n"
+                        "    mov rcx, %lu\n"
+                        "    xor eax, eax\n"
+                        "    rep stosb\n",
+                        local->offset,
+                        local->size
+                    );
+                } else {
+                    /*
+                     * Initialize scalar and pointer locals from their value.
+                     */
+                    codegen_x86_64_expression(
+                        context,
+                        statement->variable.value
+                    );
 
-                /*
-                 * Store the initializer using the local's
-                 * actual type.
-                 */
-                emit_local_store(
-                    context,
-                    local
-                );
+                    emit_local_store(
+                        context,
+                        local
+                    );
+                }
 
 
                 codegen_output_write(

@@ -15,10 +15,10 @@ void test_signed(void) {
 }
 
 u8 test_widths(void) {
-    u1 bytes[2];
-    u2 words[2];
-    u4 double_words[2];
-    u8 quad_words[2];
+    u1 bytes[2] = 0;
+    u2 words[2] = 0;
+    u4 double_words[2] = 0;
+    u8 quad_words[2] = 0;
 
     bytes[1] = 1;
     words[1] = 2;

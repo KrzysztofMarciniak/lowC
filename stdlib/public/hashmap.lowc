@@ -9,7 +9,7 @@ struct HashMap {
 };
 
 u8 hashmap_index(u8 key, u8 capacity) {
-    u8 index;
+    u8 index = 0;
 
     asm(
         "xor rdx, rdx\ndiv %2\nmov %0, rdx"
@@ -26,10 +26,10 @@ void hashmap_place(
     u8 key,
     u8 value
 ) {
-    u8 index;
-    u8 probes;
-    u8 first_deleted;
-    u1 found;
+    u8 index = 0;
+    u8 probes = 0;
+    u8 first_deleted = 0;
+    u1 found = 0;
 
     index = hashmap_index(key, map->capacity);
     probes = 0;
@@ -70,11 +70,11 @@ void hashmap_place(
 }
 
 void hashmap_resize(struct HashMap *map, u8 capacity) {
-    u8 *old_keys;
-    u8 *old_values;
-    u1 *old_states;
-    u8 old_capacity;
-    u8 index;
+    u8 *old_keys = 0;
+    u8 *old_values = 0;
+    u1 *old_states = 0;
+    u8 old_capacity = 0;
+    u8 index = 0;
 
     old_keys = map->keys;
     old_values = map->values;
@@ -107,7 +107,7 @@ void hashmap_resize(struct HashMap *map, u8 capacity) {
 }
 
 void hashmap_init(struct HashMap *map, u8 capacity) {
-    u8 index;
+    u8 index = 0;
 
     if (capacity < 8) {
         capacity = 8;
@@ -133,9 +133,9 @@ void hashmap_set(struct HashMap *map, u8 key, u8 value) {
 }
 
 u1 hashmap_get(struct HashMap *map, u8 key, u8 *value) {
-    u8 index;
-    u8 probes;
-    u1 found;
+    u8 index = 0;
+    u8 probes = 0;
+    u1 found = 0;
 
     index = hashmap_index(key, map->capacity);
     probes = 0;
@@ -160,9 +160,9 @@ u1 hashmap_get(struct HashMap *map, u8 key, u8 *value) {
 }
 
 u1 hashmap_remove(struct HashMap *map, u8 key) {
-    u8 index;
-    u8 probes;
-    u1 found;
+    u8 index = 0;
+    u8 probes = 0;
+    u1 found = 0;
 
     index = hashmap_index(key, map->capacity);
     probes = 0;
@@ -188,9 +188,9 @@ u1 hashmap_remove(struct HashMap *map, u8 key) {
 }
 
 u1 hashmap_deinit(struct HashMap *map) {
-    u1 keys_freed;
-    u1 values_freed;
-    u1 states_freed;
+    u1 keys_freed = 0;
+    u1 values_freed = 0;
+    u1 states_freed = 0;
 
     keys_freed = dealloc(map->keys);
     values_freed = dealloc(map->values);

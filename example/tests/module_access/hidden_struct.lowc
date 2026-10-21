@@ -1,6 +1,6 @@
 #include "visibility_module.lowc" : "exported_function";
 
 void entrypoint(void) {
-    struct PrivateType item;
+    struct PrivateType item = 0;
     return;
 }

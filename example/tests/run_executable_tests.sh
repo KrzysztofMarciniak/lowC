@@ -238,6 +238,32 @@ then
     exit 1
 fi
 
+cat >"$TEMP_DIR/uninitialized-local.lowc" <<'EOF'
+void entrypoint(void) {
+    u1 value;
+    return;
+}
+EOF
+
+cat >"$TEMP_DIR/uninitialized-global.lowc" <<'EOF'
+u1 value;
+void entrypoint(void) {
+    return;
+}
+EOF
+
+for scope in local global; do
+    if "$BIN" --asm "$TEMP_DIR/uninitialized-$scope.lowc" \
+        >"$TEMP_DIR/uninitialized-$scope.out" 2>&1 ||
+       ! grep -q "variables must have an initializer" \
+            "$TEMP_DIR/uninitialized-$scope.out"
+    then
+        echo "FAIL [initializers] uninitialized $scope variable was accepted"
+        cat "$TEMP_DIR/uninitialized-$scope.out"
+        exit 1
+    fi
+done
+
 cat >"$TEMP_DIR/format-input.lowc" <<'EOF'
 #include "z.lowc" : "z";
 #include "a.lowc" : "a";
@@ -493,8 +519,8 @@ cat >"$TEMP_DIR/standard-library-numbers.lowc" <<EOF
 #include "$TEMP_DIR/usr/local/share/lowc/public/string.lowc" : "parse_u8";
 
 u8 standard_library_numbers_test(void) {
-    u8 value;
-    s8 minimum;
+    u8 value = 0;
+    s8 minimum = 0;
 
     if (!parse_u8("0", &value) || value != 0) {
         return 1;
@@ -596,12 +622,12 @@ cat >"$TEMP_DIR/standard-library-data.lowc" <<EOF
     "hashmap_remove", "hashmap_deinit";
 
 u8 standard_library_data_test(void) {
-    u1 *buffer;
-    u1 *copy;
-    struct HashMap map;
-    u8 value;
-    u8 high_key;
-    u8 index;
+    u1 *buffer = 0;
+    u1 *copy = 0;
+    struct HashMap map = 0;
+    u8 value = 0;
+    u8 high_key = 0;
+    u8 index = 0;
 
     buffer = alloc(32);
     strcpy(buffer, "low");
@@ -720,8 +746,8 @@ cat >"$TEMP_DIR/standard-library-args.lowc" <<EOF
     "print", "print_u8";
 
 void entrypoint(void) {
-    u8 count;
-    u1 *argument;
+    u8 count = 0;
+    u1 *argument = 0;
 
     count = args_count();
     print_u8(count);
@@ -779,7 +805,7 @@ done
 
 cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
 u8 invalid_output(void) {
-    u8 result;
+    u8 result = 0;
     asm("nop" : "=rsp"(result) : :);
     return result;
 }

@@ -29,6 +29,17 @@ semantic_strdup(
 }
 
 static int
+semantic_is_zero_initializer(
+    const ast *expression
+)
+{
+    return
+        expression != NULL &&
+        expression->type == AST_INTEGER &&
+        strtoull(expression->integer.value, NULL, 10) == 0;
+}
+
+static int
 semantic_c_abi_integer_type(
     const char *name
 )
@@ -505,6 +516,16 @@ semantic(
             goto cleanup;
         }
 
+        if (node->variable.value == NULL) {
+            semantic_type_free(type);
+            result = semantic_error(
+                node,
+                "global variables must have an initializer"
+            );
+            goto cleanup;
+        }
+
+
         if (
             semantic_scope_find_local(
                 context.scope,
@@ -566,15 +587,24 @@ semantic(
 
         node = parser.tree->program.globals.values[i];
 
-        if (node->variable.value == NULL)
-            continue;
-
         context.current_file = node->file;
 
         symbol = semantic_scope_find_local(
             context.scope,
             node->variable.name
         );
+
+        if (
+            (
+                symbol->type->kind == SEMANTIC_TYPE_ARRAY ||
+                symbol->type->kind == SEMANTIC_TYPE_STRUCT ||
+                symbol->type->kind == SEMANTIC_TYPE_POINTER
+            ) &&
+            semantic_is_zero_initializer(node->variable.value)
+        ) {
+            context.current_file = NULL;
+            continue;
+        }
 
         error_text = NULL;
 

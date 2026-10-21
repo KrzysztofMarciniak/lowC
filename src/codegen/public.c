@@ -3,6 +3,7 @@
 
 #include "target/x86_64/context.h"
 #include "target/x86_64/function.h"
+#include "target/x86_64/type.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -133,6 +134,18 @@ codegen_constant_integer(
     return errno == 0 && *end == '\0';
 }
 
+static int
+codegen_constant_zero(
+    ast *expression
+)
+{
+    long long value;
+
+    return
+        codegen_constant_integer(expression, &value) &&
+        value == 0;
+}
+
 static const char *
 codegen_global_data_directive(
     unsigned long size
@@ -152,6 +165,27 @@ codegen_global_data_directive(
     }
 }
 
+static void
+codegen_emit_zeroed_global(
+    codegen_context *context,
+    ast *global,
+    unsigned long size,
+    unsigned long alignment
+)
+{
+    codegen_output_printf(
+        &context->output,
+        ".bss\n.align %lu\n.globl %s\n.type %s, @object\n.size %s, %lu\n%s:\n    .zero %lu\n",
+        alignment,
+        global->variable.name,
+        global->variable.name,
+        global->variable.name,
+        size,
+        global->variable.name,
+        size
+    );
+}
+
 static int
 codegen_emit_global(
     codegen_context *context,
@@ -162,6 +196,7 @@ codegen_emit_global(
     unsigned long size;
     unsigned long alignment;
     const char *directive;
+    int is_aggregate;
     long long initializer;
 
     codegen_x86_64_context_init(&layout, &context->output);
@@ -186,16 +221,50 @@ codegen_emit_global(
         );
     }
 
+    is_aggregate =
+        global->variable.array_length != NULL ||
+        (
+            global->variable.pointer_depth == 0 &&
+            codegen_x86_64_type_size(
+                global->variable.type,
+                0
+            ) == 0
+        );
+
     if (size == 0) {
         codegen_fail(context, "cannot determine global variable size");
         return 1;
     }
 
     if (global->variable.value) {
+        if (is_aggregate) {
+            if (
+                !codegen_constant_integer(
+                    global->variable.value,
+                    &initializer
+                ) ||
+                initializer != 0
+            ) {
+                codegen_fail(
+                    context,
+                    "aggregate global initializer must be zero"
+                );
+                return 1;
+            }
+
+            codegen_emit_zeroed_global(
+                context,
+                global,
+                size,
+                alignment
+            );
+            codegen_x86_64_context_free(&layout);
+            return 0;
+        }
+
         directive = codegen_global_data_directive(size);
         if (
             !directive ||
-            global->variable.array_length ||
             !codegen_constant_integer(
                 global->variable.value,
                 &initializer
@@ -221,16 +290,11 @@ codegen_emit_global(
             initializer
         );
     } else {
-        codegen_output_printf(
-            &context->output,
-            ".bss\n.align %lu\n.globl %s\n.type %s, @object\n.size %s, %lu\n%s:\n    .zero %lu\n",
-            alignment,
-            global->variable.name,
-            global->variable.name,
-            global->variable.name,
+        codegen_emit_zeroed_global(
+            context,
+            global,
             size,
-            global->variable.name,
-            size
+            alignment
         );
     }
 
@@ -285,11 +349,11 @@ codegen_emit_process_args_bridge(
         strcmp(argc_global->variable.type, "u8") != 0 ||
         argc_global->variable.pointer_depth != 0 ||
         argc_global->variable.array_length != NULL ||
-        argc_global->variable.value != NULL ||
+        !codegen_constant_zero(argc_global->variable.value) ||
         strcmp(argv_global->variable.type, "u1") != 0 ||
         argv_global->variable.pointer_depth != 2 ||
         argv_global->variable.array_length != NULL ||
-        argv_global->variable.value != NULL
+        !codegen_constant_zero(argv_global->variable.value)
     ) {
         codegen_fail(
             context,

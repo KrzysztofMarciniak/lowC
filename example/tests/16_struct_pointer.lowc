@@ -4,8 +4,8 @@ struct Point {
 };
 
 void entrypoint(void) {
-    struct Point p;
-    struct Point *ptr;
+    struct Point p = 0;
+    struct Point *ptr = 0;
     ptr = &p;
     ptr->x = 10;
     ptr->y = 20;

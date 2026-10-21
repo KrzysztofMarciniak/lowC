@@ -6,7 +6,7 @@ s8 module_math(void) {
 }
 
 s8 module_sum(void) {
-    struct Point point;
+    struct Point point = 0;
     point.x = base;
     point.y = module_add(22) + global_point_x();
     return point.x + point.y;

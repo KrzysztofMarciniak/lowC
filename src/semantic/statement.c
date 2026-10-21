@@ -29,6 +29,17 @@ semantic_strdup(
 }
 
 static int
+semantic_is_zero_initializer(
+    const ast *expression
+)
+{
+    return
+        expression != NULL &&
+        expression->type == AST_INTEGER &&
+        strtoull(expression->integer.value, NULL, 10) == 0;
+}
+
+static int
 semantic_asm_is_register(
     const char *name
 )
@@ -427,6 +438,16 @@ semantic_check_statement(
                 type = array_type;
             }
 
+            if (statement->variable.value == NULL)
+            {
+                *error_text = semantic_strdup(
+                    "variables must have an initializer"
+                );
+
+                semantic_type_free(type);
+                return 1;
+            }
+
 
             if (
                 semantic_scope_find_local(
@@ -485,6 +506,26 @@ semantic_check_statement(
             {
                 semantic_type *value;
 
+                if (
+                    (
+                        type->kind == SEMANTIC_TYPE_ARRAY ||
+                        type->kind == SEMANTIC_TYPE_STRUCT
+                    ) &&
+                    semantic_is_zero_initializer(
+                        statement->variable.value
+                    )
+                ) {
+                    return 0;
+                }
+
+                if (
+                    type->kind == SEMANTIC_TYPE_POINTER &&
+                    semantic_is_zero_initializer(
+                        statement->variable.value
+                    )
+                ) {
+                    return 0;
+                }
 
                 value = semantic_check_expression(
                     context,

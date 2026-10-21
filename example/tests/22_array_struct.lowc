@@ -4,7 +4,7 @@ s8 y;
 };
 
 s8 main(void) {
-struct Point points[3];
+struct Point points[3] = 0;
 
 points[0].x = 10;
 points[0].y = 20;
@@ -18,4 +18,3 @@ points[2].y = 60;
 return points[1].x + points[1].y;
 
 }
-

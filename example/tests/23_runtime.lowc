@@ -16,22 +16,22 @@ struct Point {
 };
 
 s8 point_sum(void) {
-    struct Point point;
+    struct Point point = 0;
     point.x = 10;
     point.y = 32;
     return point.x + point.y;
 }
 
 s8 byte_array_sum(void) {
-    u1 values[3];
+    u1 values[3] = 0;
     values[0] = 20;
     values[1] = 22;
     return values[0] + values[1];
 }
 
 s8 pointer_member_sum(void) {
-    struct Point point;
-    struct Point *pointer;
+    struct Point point = 0;
+    struct Point *pointer = 0;
     pointer = &point;
     pointer->x = 20;
     pointer->y = 22;
@@ -39,15 +39,15 @@ s8 pointer_member_sum(void) {
 }
 
 s8 struct_array_sum(void) {
-    struct Point points[2];
+    struct Point points[2] = 0;
     points[0].x = 20;
     points[1].y = 22;
     return points[0].x + points[1].y;
 }
 
 s8 pointer_arithmetic(void) {
-    s8 values[2];
-    s8 *pointer;
+    s8 values[2] = 0;
+    s8 *pointer = 0;
     pointer = &values[0];
     *(pointer + 1) = 42;
     return values[1];

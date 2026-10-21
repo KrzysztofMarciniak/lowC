@@ -1,6 +1,6 @@
 void __lowc_write_stdout(u1 *data, u8 length) {
     for (; length != 0; ) {
-        s8 written;
+        s8 written = 0;
 
         asm("syscall"
             : "=rax"(written)
@@ -19,10 +19,10 @@ void __lowc_write_stdout(u1 *data, u8 length) {
 }
 
 void __lowc_print_u8(u8 value) {
-    u1 digits[20];
-    u8 index;
-    u8 quotient;
-    u8 remainder;
+    u1 digits[20] = 0;
+    u8 index = 0;
+    u8 quotient = 0;
+    u8 remainder = 0;
 
     index = 20;
 
@@ -49,7 +49,7 @@ void __lowc_print_u8(u8 value) {
 }
 
 void __lowc_print_s8(s8 value) {
-    u8 magnitude;
+    u8 magnitude = 0;
 
     if (value < 0) {
         __lowc_write_stdout("-", 1);

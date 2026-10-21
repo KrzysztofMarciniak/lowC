@@ -1,5 +1,5 @@
-u8 __lowc_args_argc;
-u1 **__lowc_args_argv;
+u8 __lowc_args_argc = 0;
+u1 **__lowc_args_argv = 0;
 
 u8 args_count(void) {
     return __lowc_args_argc;

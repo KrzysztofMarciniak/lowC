@@ -6,13 +6,13 @@ u8 strlen(u1 *data) {
 }
 
 u1 parse_u8(u1 *text, u8 *result) {
-    u1 *maximum;
-    u8 length;
-    u8 first_significant;
-    u8 significant_length;
-    u8 index;
-    u8 parsed;
-    s8 comparison;
+    u1 *maximum = 0;
+    u8 length = 0;
+    u8 first_significant = 0;
+    u8 significant_length = 0;
+    u8 index = 0;
+    u8 parsed = 0;
+    s8 comparison = 0;
 
     maximum = "18446744073709551615";
     length = 0;
@@ -70,7 +70,7 @@ u1 parse_u8(u1 *text, u8 *result) {
 }
 
 s8 strcmp(u1 *left, u1 *right) {
-    u8 index;
+    u8 index = 0;
 
     for (
         index = 0;
@@ -91,8 +91,8 @@ s8 strcmp(u1 *left, u1 *right) {
 }
 
 u1 *strcpy(u1 *destination, u1 *source) {
-    u1 *result;
-    u8 index;
+    u1 *result = 0;
+    u8 index = 0;
 
     result = destination;
 
@@ -105,9 +105,9 @@ u1 *strcpy(u1 *destination, u1 *source) {
 }
 
 u1 *strcat(u1 *destination, u1 *source) {
-    u1 *result;
-    u8 destination_length;
-    u8 source_index;
+    u1 *result = 0;
+    u8 destination_length = 0;
+    u8 source_index = 0;
 
     result = destination;
 
@@ -128,9 +128,9 @@ u1 *strcat(u1 *destination, u1 *source) {
 }
 
 u1 *strdup(u1 *source) {
-    u1 *result;
-    u8 length;
-    u8 index;
+    u1 *result = 0;
+    u8 length = 0;
+    u8 index = 0;
 
     length = strlen(source);
     result = alloc(length + 1);

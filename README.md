@@ -125,9 +125,12 @@ void
 
 ### Declaration
 
+Every variable must have an initializer. Use `= 0` for an explicit zero
+initial value; arrays and struct values can also be zero-initialized this way.
+
 ```c
-u8 x;
-u8 x = 42;
+u8 x = 0;
+u8 y = 42;
 ```
 
 ### Assignment
@@ -176,7 +179,7 @@ Comparisons return `u1`, an unsigned one-byte value.
 ### Declaration and Usage
 
 ```c
-u8 *p;
+u8 *p = 0;
 
 p = &x;
 
@@ -193,7 +196,7 @@ Pointer arithmetic is automatically scaled by the size of the pointed-to type.
 ### Declaration and Access
 
 ```c
-u8 values[10];
+u8 values[10] = 0;
 
 values[0] = 42;
 ```
@@ -205,8 +208,8 @@ lowC does **not** perform implicit array-to-pointer decay.
 An array expression retains its array type and cannot be implicitly assigned to a pointer:
 
 ```c
-s8 values[5];
-s8 *p;
+s8 values[5] = 0;
+s8 *p = 0;
 
 p = values;        // invalid
 ```
@@ -243,7 +246,7 @@ struct Point {
     s8 y;
 };
 
-struct Point p;
+struct Point p = 0;
 
 p.x = 10;
 p.y = 20;
@@ -252,7 +255,7 @@ p.y = 20;
 ### Pointer Access
 
 ```c
-struct Point *p;
+struct Point *p = 0;
 
 p->x = 10;
 ```
@@ -262,7 +265,7 @@ p->x = 10;
 Struct types can be used as array element types:
 
 ```c
-struct Point points[10];
+struct Point points[10] = 0;
 
 points[0].x = 10;
 points[0].y = 20;
@@ -467,8 +470,8 @@ preserving the required `void entrypoint(void)` signature:
 
 void entrypoint(void) {
     u8 count = args_count();
-    u8 index;
-    u1 *argument;
+    u8 index = 0;
+    u1 *argument = 0;
 
     print("args count = ");
     print_u8(count);
@@ -564,8 +567,8 @@ whether the key existed:
     "hashmap_get", "hashmap_remove", "hashmap_deinit";
 
 u1 hashmap_example(void) {
-    struct HashMap map;
-    u8 value;
+    struct HashMap map = 0;
+    u8 value = 0;
 
     hashmap_init(&map, 8);
     hashmap_set(&map, 42, 100);
@@ -619,7 +622,7 @@ register, and `%0`, `%1`, and subsequent placeholders refer to outputs first,
 then inputs:
 
 ```c
-u8 result;
+u8 result = 0;
 asm("mov %0, %1" : "=rax"(result) : "rdi"(42) : "rcx");
 ```
 

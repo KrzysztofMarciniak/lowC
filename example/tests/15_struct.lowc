@@ -4,7 +4,7 @@ struct Point {
 };
 
 s8 main(void) {
-    struct Point p;
+    struct Point p = 0;
     p.x = 10;
     p.y = 20;
     return p.x + p.y;

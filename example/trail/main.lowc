@@ -8,7 +8,7 @@ s8 point_value(s8 x, s8 y) {
 }
 
 s8 calculate_score(void) {
-    struct Point stops[3];
+    struct Point stops[3] = 0;
     stops[0].x = 2;
     stops[0].y = 1;
     stops[1].x = 3;
@@ -16,13 +16,13 @@ s8 calculate_score(void) {
     stops[2].x = 1;
     stops[2].y = 4;
 
-    s8 distances[3];
+    s8 distances[3] = 0;
     distances[0] = 4;
     distances[1] = 12;
     distances[2] = 8;
 
-    struct Point *stop;
-    s8 *distance;
+    struct Point *stop = 0;
+    s8 *distance = 0;
     distance = &distances[0];
 
     s8 total = 0;

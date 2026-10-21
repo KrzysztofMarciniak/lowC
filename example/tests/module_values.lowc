@@ -6,7 +6,7 @@ struct Point {
 s8 base = 20;
 
 s8 module_add(s8 value) {
-    struct Point point;
+    struct Point point = 0;
     point.x = base;
     point.y = value;
     return point.x + point.y;
