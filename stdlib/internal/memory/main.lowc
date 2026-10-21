@@ -1,5 +1,5 @@
-u8 *__lowc_mmap(u64 length) {
-    u8 *address;
+u1 *__lowc_mmap(u8 length) {
+    u1 *address;
 
     asm(
         "syscall\ntest rax, rax\njns 1f\nmov rax, 231\nmov rdi, 1\nsyscall\nud2\n1:"
@@ -12,8 +12,8 @@ u8 *__lowc_mmap(u64 length) {
     return address;
 }
 
-s64 __lowc_munmap(u8 *address, u64 length) {
-    s64 result;
+s8 __lowc_munmap(u1 *address, u8 length) {
+    s8 result;
 
     asm("syscall"
         : "=rax"(result)
@@ -23,8 +23,8 @@ s64 __lowc_munmap(u8 *address, u64 length) {
     return result;
 }
 
-u64 __lowc_allocation_size(u64 size) {
-    u64 total;
+u8 __lowc_allocation_size(u8 size) {
+    u8 total;
 
     asm(
         "add rax, 8\njnc 1f\nmov rax, 231\nmov rdi, 1\nsyscall\nud2\n1:"
@@ -36,12 +36,12 @@ u64 __lowc_allocation_size(u64 size) {
     return total;
 }
 
-u8 *__lowc_alloc(u64 size) {
-    u8 *base;
-    u8 *result;
+u1 *__lowc_alloc(u8 size) {
+    u1 *base;
+    u1 *result;
     void *header_address;
-    u64 *header;
-    u64 allocation_size;
+    u8 *header;
+    u8 allocation_size;
 
     if (size == 0) {
         size = 1;
@@ -57,11 +57,11 @@ u8 *__lowc_alloc(u64 size) {
     return result;
 }
 
-u1 __lowc_dealloc(u8 *data) {
-    u8 *base;
+u1 __lowc_dealloc(u1 *data) {
+    u1 *base;
     void *header_address;
-    u64 *header;
-    u64 allocation_size;
+    u8 *header;
+    u8 allocation_size;
 
     base = data - 8;
     header_address = base;

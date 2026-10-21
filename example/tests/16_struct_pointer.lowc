@@ -1,6 +1,6 @@
 struct Point {
-    s64 x;
-    s64 y;
+    s8 x;
+    s8 y;
 };
 
 void entrypoint(void) {

@@ -55,10 +55,55 @@ then
     exit 1
 fi
 
+for invalid_type in u9 s9 u16 s64; do
+    cat >"$TEMP_DIR/oversized-type.lowc" <<EOF
+void oversized_type(void) {
+    $invalid_type value;
+    return;
+}
+EOF
+
+    if "$BIN" --asm "$TEMP_DIR/oversized-type.lowc" \
+        >"$TEMP_DIR/oversized-type.out" 2>&1
+    then
+        echo "FAIL [types] accepted oversized or removed type '$invalid_type'"
+        exit 1
+    fi
+done
+
+if ! "$BIN" --asm "$SCRIPT_DIR/19_types.lowc" \
+    >"$TEMP_DIR/type-widths.s" ||
+   ! grep -q "BYTE PTR" "$TEMP_DIR/type-widths.s" ||
+   ! grep -q "WORD PTR" "$TEMP_DIR/type-widths.s" ||
+   ! grep -q "DWORD PTR" "$TEMP_DIR/type-widths.s" ||
+   ! grep -q "QWORD PTR" "$TEMP_DIR/type-widths.s"
+then
+    echo "FAIL [types] byte widths did not generate the expected x86-64 stores"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/type-widths-harness.c" <<'EOF'
+unsigned long test_widths(void);
+
+int
+main(void)
+{
+    return test_widths() == 15 ? 0 : 1;
+}
+EOF
+
+if ! cc -x assembler "$TEMP_DIR/type-widths.s" -x c \
+    "$TEMP_DIR/type-widths-harness.c" -o "$TEMP_DIR/type-widths" ||
+   ! "$TEMP_DIR/type-widths"
+then
+    echo "FAIL [types] byte-width arrays did not execute correctly"
+    exit 1
+fi
+
 cat >"$TEMP_DIR/format-input.lowc" <<'EOF'
 #include "z.lowc" : "z";
 #include "a.lowc" : "a";
-void entrypoint(void){u64 b=2;u64 a=1;if(a){b=b+1;long_name=2;}}
+void entrypoint(void){u8 b=2;u8 a=1;if(a){b=b+1;long_name=2;}}
 EOF
 cp "$TEMP_DIR/format-input.lowc" "$TEMP_DIR/format-original.lowc"
 
@@ -74,8 +119,8 @@ cat >"$TEMP_DIR/format-expected.lowc" <<'EOF'
 #include "z.lowc" : "z";
 
 void entrypoint(void) {
-        u64 b = 2;
-        u64 a = 1;
+        u8 b = 2;
+        u8 a = 1;
         if (a) {
                 b         = b + 1;
                 long_name = 2;
@@ -254,7 +299,7 @@ cat >"$TEMP_DIR/standard-library-print.lowc" <<EOF
 #include "$TEMP_DIR/usr/local/share/lowc/public/string.lowc" : "strlen";
 
 void entrypoint(void) {
-    u64 length = strlen("Hello, World\\n");
+    u8 length = strlen("Hello, World\\n");
     print("Hello, World\\n");
 }
 EOF
@@ -312,9 +357,9 @@ cat >"$TEMP_DIR/standard-library-numbers.lowc" <<EOF
     "print_s16", "print_s32", "print_s64";
 #include "$TEMP_DIR/usr/local/share/lowc/public/string.lowc" : "parse_u64";
 
-u64 standard_library_numbers_test(void) {
-    u64 value;
-    s64 minimum;
+u8 standard_library_numbers_test(void) {
+    u8 value;
+    s8 minimum;
 
     if (!parse_u64("0", &value) || value != 0) {
         return 1;
@@ -427,13 +472,13 @@ cat >"$TEMP_DIR/standard-library-data.lowc" <<EOF
     "HashMap", "hashmap_init", "hashmap_set", "hashmap_get",
     "hashmap_remove", "hashmap_deinit";
 
-u64 standard_library_data_test(void) {
-    u8 *buffer;
-    u8 *copy;
+u8 standard_library_data_test(void) {
+    u1 *buffer;
+    u1 *copy;
     struct HashMap map;
-    u64 value;
-    u64 high_key;
-    u64 index;
+    u8 value;
+    u8 high_key;
+    u8 index;
 
     buffer = alloc(32);
     strcpy(buffer, "low");
@@ -552,8 +597,8 @@ cat >"$TEMP_DIR/standard-library-args.lowc" <<EOF
     "print", "print_u64";
 
 void entrypoint(void) {
-    u64 count;
-    u8 *argument;
+    u8 count;
+    u1 *argument;
 
     count = args_count();
     print_u64(count);
@@ -610,8 +655,8 @@ for mode in unoptimized optimized; do
 done
 
 cat >"$TEMP_DIR/invalid-inline-asm.lowc" <<'EOF'
-u64 invalid_output(void) {
-    u64 result;
+u8 invalid_output(void) {
+    u8 result;
     asm("nop" : "=rsp"(result) : :);
     return result;
 }

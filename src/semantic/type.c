@@ -50,17 +50,11 @@ semantic_type_is_integer(
         case SEMANTIC_TYPE_U2:
         case SEMANTIC_TYPE_U4:
         case SEMANTIC_TYPE_U8:
-        case SEMANTIC_TYPE_U16:
-        case SEMANTIC_TYPE_U32:
-        case SEMANTIC_TYPE_U64:
 
         case SEMANTIC_TYPE_S1:
         case SEMANTIC_TYPE_S2:
         case SEMANTIC_TYPE_S4:
         case SEMANTIC_TYPE_S8:
-        case SEMANTIC_TYPE_S16:
-        case SEMANTIC_TYPE_S32:
-        case SEMANTIC_TYPE_S64:
 
             return 1;
 
@@ -99,15 +93,6 @@ semantic_type_builtin(
     else if (strcmp(name, "u8") == 0)
         type->kind = SEMANTIC_TYPE_U8;
 
-    else if (strcmp(name, "u16") == 0)
-        type->kind = SEMANTIC_TYPE_U16;
-
-    else if (strcmp(name, "u32") == 0)
-        type->kind = SEMANTIC_TYPE_U32;
-
-    else if (strcmp(name, "u64") == 0)
-        type->kind = SEMANTIC_TYPE_U64;
-
     else if (strcmp(name, "s1") == 0)
         type->kind = SEMANTIC_TYPE_S1;
 
@@ -119,15 +104,6 @@ semantic_type_builtin(
 
     else if (strcmp(name, "s8") == 0)
         type->kind = SEMANTIC_TYPE_S8;
-
-    else if (strcmp(name, "s16") == 0)
-        type->kind = SEMANTIC_TYPE_S16;
-
-    else if (strcmp(name, "s32") == 0)
-        type->kind = SEMANTIC_TYPE_S32;
-
-    else if (strcmp(name, "s64") == 0)
-        type->kind = SEMANTIC_TYPE_S64;
 
     else
     {
@@ -334,14 +310,14 @@ semantic_type_equal(
  * All builtin integer types are assignment-compatible.
  *
  * This is intentional because integer literals currently have
- * the semantic type s64. Therefore:
+ * the semantic type s8. Therefore:
  *
  *     u1 a = 1;
  *
  * sees:
  *
  *     destination: u1
- *     source:      s64
+ *     source:      s8
  *
  * and must be accepted.
  *
@@ -396,33 +372,20 @@ semantic_type_size(
 
 
         case SEMANTIC_TYPE_U1:
-        case SEMANTIC_TYPE_U2:
-        case SEMANTIC_TYPE_U4:
-        case SEMANTIC_TYPE_U8:
+        case SEMANTIC_TYPE_S1:
             return 1;
 
-
-        case SEMANTIC_TYPE_U16:
-        case SEMANTIC_TYPE_S16:
+        case SEMANTIC_TYPE_U2:
+        case SEMANTIC_TYPE_S2:
             return 2;
 
-
-        case SEMANTIC_TYPE_U32:
-        case SEMANTIC_TYPE_S32:
+        case SEMANTIC_TYPE_U4:
+        case SEMANTIC_TYPE_S4:
             return 4;
 
-
-        case SEMANTIC_TYPE_U64:
-        case SEMANTIC_TYPE_S64:
-            return 8;
-
-
-        case SEMANTIC_TYPE_S1:
-        case SEMANTIC_TYPE_S2:
-        case SEMANTIC_TYPE_S4:
+        case SEMANTIC_TYPE_U8:
         case SEMANTIC_TYPE_S8:
-            return 1;
-
+            return 8;
 
         case SEMANTIC_TYPE_POINTER:
             return 8;

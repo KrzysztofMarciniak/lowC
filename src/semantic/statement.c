@@ -97,16 +97,10 @@ semantic_asm_type_supported(
         case SEMANTIC_TYPE_U2:
         case SEMANTIC_TYPE_U4:
         case SEMANTIC_TYPE_U8:
-        case SEMANTIC_TYPE_U16:
-        case SEMANTIC_TYPE_U32:
-        case SEMANTIC_TYPE_U64:
         case SEMANTIC_TYPE_S1:
         case SEMANTIC_TYPE_S2:
         case SEMANTIC_TYPE_S4:
         case SEMANTIC_TYPE_S8:
-        case SEMANTIC_TYPE_S16:
-        case SEMANTIC_TYPE_S32:
-        case SEMANTIC_TYPE_S64:
             return 1;
 
         default:
@@ -368,7 +362,7 @@ semantic_check_statement(
             /*
              * Convert an array declaration such as:
              *
-             *     s64 values[5];
+             *     s8 values[5];
              *
              * from:
              *

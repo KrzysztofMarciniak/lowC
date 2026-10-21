@@ -5,14 +5,14 @@
 
 
 /*
- * Parse the bit width from an integer type name.
+ * Parse the byte width from an integer type name.
  *
  * Examples:
  *
- *     u1  -> 1
- *     u8  -> 8
- *     u32 -> 32
- *     s64 -> 64
+ *     u1 -> 1
+ *     u2 -> 2
+ *     u4 -> 4
+ *     u8 -> 8
  *
  * Returns zero when the type is not a primitive integer
  * type.
@@ -91,21 +91,12 @@ codegen_x86_64_type_size(
                 return 1;
 
             case 2:
-                return 1;
-
-            case 4:
-                return 1;
-
-            case 8:
-                return 1;
-
-            case 16:
                 return 2;
 
-            case 32:
+            case 4:
                 return 4;
 
-            case 64:
+            case 8:
                 return 8;
 
             default:

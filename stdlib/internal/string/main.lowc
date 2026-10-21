@@ -1,5 +1,5 @@
-u64 __lowc_strlen(u8 *data){
-	u64 length;
+u8 __lowc_strlen(u1 *data){
+	u8 length;
 	for (length = 0; data[length] != 0; length = length +1){
 	}
 	return length;

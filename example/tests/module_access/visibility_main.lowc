@@ -1,6 +1,6 @@
 #include "visibility_module.lowc" : "Exported", "exported_global", "exported_function";
 
-s64 visibility_value(void) {
+s8 visibility_value(void) {
     struct Exported item;
     item.value = exported_function() + exported_global;
     return item.value;

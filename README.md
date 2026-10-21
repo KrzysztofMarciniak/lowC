@@ -6,7 +6,7 @@ A small C-like systems language and compiler.
 
 lowC is a compact compiled language with a clean, C-inspired syntax. It provides explicit control over data representation and memory while keeping the language and compiler straightforward.
 
-lowC supports functions, structs, pointers, arrays, explicit-width integers, and direct control flow. The compiler produces explicit machine code and does not use an intermediate representation (IR).
+lowC supports functions, structs, pointers, arrays, explicit byte-width integers, and direct control flow. The compiler produces explicit machine code and does not use an intermediate representation (IR).
 
 The generated assembly prioritizes clarity and explicitness, with detailed commentary rather than aggressive optimization.
 
@@ -98,18 +98,19 @@ The language is intentionally small, but small does not mean it is toy-oriented.
 
 ### Unsigned Integers
 
-**1, 2, 4, 8, 16, 32, and 64-bit:**
+Types are named by their size in bytes. Supported sizes are 1, 2, 4, and 8
+bytes (up to 64 bits):
 
 ```c
-u1  u2  u4  u8  u16  u32  u64
+u1  u2  u4  u8
 ```
 
 ### Signed Integers
 
-**1, 2, 4, 8, 16, 32, and 64-bit:**
+The same byte sizes are supported for signed integers:
 
 ```c
-s1  s2  s4  s8  s16  s32  s64
+s1  s2  s4  s8
 ```
 
 ### Other Types
@@ -125,8 +126,8 @@ void
 ### Declaration
 
 ```c
-u64 x;
-u64 x = 42;
+u8 x;
+u8 x = 42;
 ```
 
 ### Assignment
@@ -158,7 +159,7 @@ x = 10;
 ==  !=  <  <=  >  >=
 ```
 
-Comparisons return `u1`.
+Comparisons return `u1`, an unsigned one-byte value.
 
 ### Logic
 
@@ -175,7 +176,7 @@ Comparisons return `u1`.
 ### Declaration and Usage
 
 ```c
-u64 *p;
+u8 *p;
 
 p = &x;
 
@@ -192,7 +193,7 @@ Pointer arithmetic is automatically scaled by the size of the pointed-to type.
 ### Declaration and Access
 
 ```c
-u64 values[10];
+u8 values[10];
 
 values[0] = 42;
 ```
@@ -204,8 +205,8 @@ lowC does **not** perform implicit array-to-pointer decay.
 An array expression retains its array type and cannot be implicitly assigned to a pointer:
 
 ```c
-s64 values[5];
-s64 *p;
+s8 values[5];
+s8 *p;
 
 p = values;        // invalid
 ```
@@ -238,8 +239,8 @@ Pointer arithmetic is scaled by the size of the pointed-to type.
 
 ```c
 struct Point {
-    s64 x;
-    s64 y;
+    s8 x;
+    s8 y;
 };
 
 struct Point p;
@@ -279,7 +280,7 @@ Array indexing is performed before member access, so points[1].x accesses the x 
 ### Basic Functions
 
 ```c
-s64 add(s64 a, s64 b) {
+s8 add(s8 a, s8 b) {
     return a + b;
 }
 ```
@@ -373,11 +374,11 @@ For example:
 **math.lowc**
 
 ```c
-s64 add(s64 a, s64 b) {
+s8 add(s8 a, s8 b) {
     return a + b;
 }
 
-s64 sqrt(s64 x) {
+s8 sqrt(s8 x) {
     ...
 }
 ```
@@ -388,7 +389,7 @@ s64 sqrt(s64 x) {
 #include "math.lowc" : "add";
 
 void entrypoint(void) {
-    s64 result = add(10, 20);
+    s8 result = add(10, 20);
 }
 ```
 
@@ -427,9 +428,9 @@ preserving the required `void entrypoint(void)` signature:
     "print", "print_u64";
 
 void entrypoint(void) {
-    u64 count = args_count();
-    u64 index;
-    u8 *argument;
+    u8 count = args_count();
+    u8 index;
+    u1 *argument;
 
     print("args count = ");
     print_u64(count);
@@ -451,7 +452,7 @@ pointer unchanged. Returned strings are borrowed, NUL-terminated process
 arguments: do not modify or deallocate them. The startup bridge currently
 supports Linux x86-64.
 
-String literals evaluate to `u8 *` and are stored as read-only byte data. The
+String literals evaluate to `u1 *` and are stored as read-only byte data. The
 public `print` function calculates their length with the public `strlen`
 helper, so output stops at the first NUL byte. `print` writes to standard
 output via the Linux x86-64 `write` syscall; it has no error return in this
@@ -480,16 +481,16 @@ Use `strlen` directly by importing `string.lowc`:
     "strlen", "parse_u64", "strcmp", "strcpy", "strcat", "strdup";
 #include "/usr/local/share/lowc/public/memory.lowc" : "dealloc";
 
-u64 string_example(void) {
-    u8 *copy = strdup("Hello");
-    u64 length = strlen(copy);
+u8 string_example(void) {
+    u1 *copy = strdup("Hello");
+    u8 length = strlen(copy);
     dealloc(copy);
     return length;
 }
 ```
 
 `parse_u64(text, &value)` returns true for a non-empty sequence of decimal
-digits that fits in `u64`, and writes the parsed value only on success. It
+digits that fits in `u8`, and writes the parsed value only on success. It
 accepts leading zeroes but rejects signs, whitespace, other characters, and
 overflow.
 
@@ -504,7 +505,7 @@ The `memory.lowc` module provides Linux x86-64 `mmap`-backed allocations:
 #include "/usr/local/share/lowc/public/memory.lowc" : "alloc", "dealloc";
 
 u1 allocation_example(void) {
-    u8 *buffer = alloc(128);
+    u1 *buffer = alloc(128);
     buffer[0] = 42;
     return dealloc(buffer);
 }
@@ -514,7 +515,7 @@ Allocation failure terminates the process with status 1. `dealloc` returns
 whether the underlying unmap succeeded; only pass it pointers returned by
 `alloc` or `strdup`, and release each allocation once.
 
-The `hashmap.lowc` module provides an open-addressed `u64`-to-`u64` map with
+The `hashmap.lowc` module provides an open-addressed `u8`-to-`u8` map with
 linear probing and automatic growth. Import `HashMap`, `hashmap_init`,
 `hashmap_set`, `hashmap_get`, `hashmap_remove`, and `hashmap_deinit`. Initialize
 the struct before use; `hashmap_get` writes into its output pointer and returns
@@ -527,7 +528,7 @@ whether the key existed:
 
 u1 hashmap_example(void) {
     struct HashMap map;
-    u64 value;
+    u8 value;
 
     hashmap_init(&map, 8);
     hashmap_set(&map, 42, 100);
@@ -581,7 +582,7 @@ register, and `%0`, `%1`, and subsequent placeholders refer to outputs first,
 then inputs:
 
 ```c
-u64 result;
+u8 result;
 asm("mov %0, %1" : "=rax"(result) : "rdi"(42) : "rcx");
 ```
 

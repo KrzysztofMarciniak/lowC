@@ -36,7 +36,7 @@ semantic_struct_free(
 /**
  * @brief Resolve a type name (with a pointer depth) to a semantic_type.
  *
- * Tries the builtin types first (u1..u64, s1..s64, void), then falls
+ * Tries the builtin types first (u1/u2/u4/u8, s1/s2/s4/s8, void), then falls
  * back to the registered struct list. This is the single place type
  * names get turned into semantic_type objects, so builtins and struct
  * types are resolved consistently everywhere (globals, parameters,

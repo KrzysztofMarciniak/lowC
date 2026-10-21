@@ -258,16 +258,10 @@ lexer_keyword(
         strcmp(value, "u2") == 0 ||
         strcmp(value, "u4") == 0 ||
         strcmp(value, "u8") == 0 ||
-        strcmp(value, "u16") == 0 ||
-        strcmp(value, "u32") == 0 ||
-        strcmp(value, "u64") == 0 ||
         strcmp(value, "s1") == 0 ||
         strcmp(value, "s2") == 0 ||
         strcmp(value, "s4") == 0 ||
-        strcmp(value, "s8") == 0 ||
-        strcmp(value, "s16") == 0 ||
-        strcmp(value, "s32") == 0 ||
-        strcmp(value, "s64") == 0
+        strcmp(value, "s8") == 0
     )
     {
         return TOKEN_TYPE;

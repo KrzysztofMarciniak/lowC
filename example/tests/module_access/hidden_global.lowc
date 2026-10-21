@@ -1,6 +1,6 @@
 #include "visibility_module.lowc" : "exported_function";
 
-s64 read_private_global(void) {
+s8 read_private_global(void) {
     return private_global;
 }
 

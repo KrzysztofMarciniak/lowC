@@ -1,18 +1,18 @@
 struct Point {
-    s64 x;
-    s64 y;
+    s8 x;
+    s8 y;
 };
 
-s64 base = 20;
+s8 base = 20;
 
-s64 module_add(s64 value) {
+s8 module_add(s8 value) {
     struct Point point;
     point.x = base;
     point.y = value;
     return point.x + point.y;
 }
 
-s64 global_point_x(void) {
+s8 global_point_x(void) {
     base = base + 1;
     return base;
 }

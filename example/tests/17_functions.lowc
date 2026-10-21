@@ -1,7 +1,7 @@
-s64 add(s64 a, s64 b) {
+s8 add(s8 a, s8 b) {
     return a + b;
 }
 
-s64 main(void) {
+s8 main(void) {
     return add(10, 20);
 }

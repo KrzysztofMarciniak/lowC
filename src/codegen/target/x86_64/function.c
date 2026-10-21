@@ -116,10 +116,10 @@ align_up(
  *
  * Examples:
  *
- *     s64
- *     u32
- *     s64 *
- *     u8 **
+ *     s8
+ *     u4
+ *     s8 *
+ *     u1 **
  */
 static void
 emit_type(
@@ -161,11 +161,11 @@ emit_type(
  *
  * Example:
  *
- *     s64 entrypoint(void)
+ *     s8 entrypoint(void)
  *
  * Example:
  *
- *     s64 add(s64 left, s64 right)
+ *     s8 add(s8 left, s8 right)
  */
 static void
 emit_function_signature(

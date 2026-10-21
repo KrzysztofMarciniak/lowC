@@ -1,6 +1,6 @@
-s64 route_bonus = 16;
+s8 route_bonus = 16;
 
-s64 distance_reward(s64 distance) {
+s8 distance_reward(s8 distance) {
     if (distance <= 10) {
         return 3;
     } else {

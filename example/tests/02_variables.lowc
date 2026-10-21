@@ -1,6 +1,6 @@
-s64 main(void) {
-    s64 x;
-    s64 y = 42;
+s8 main(void) {
+    s8 x;
+    s8 y = 42;
     x = y;
     return x;
 }

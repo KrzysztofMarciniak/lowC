@@ -35,7 +35,7 @@ void entrypoint(void) {
 ```
 
 `entrypoint` is where an executable begins; it must take no parameters and
-return `void`. The installed `print` module accepts a NUL-terminated `u8 *`
+return `void`. The installed `print` module accepts a NUL-terminated `u1 *`
 string and calculates its length internally. Its Linux x86-64 implementation
 writes to standard output. If you installed with a different `PREFIX`, replace
 `/usr/local` in the import path with that prefix.
@@ -57,21 +57,23 @@ CC=clang build/lowc -o hello hello.lowc
 
 ## 4. Learn the basic types and variables
 
-lowC has explicit-width signed and unsigned integers:
+lowC has signed and unsigned integers whose type suffix gives the size in
+bytes. Supported sizes are 1, 2, 4, and 8 bytes, with 8 bytes as the maximum:
 
 ```c
-s8 small_signed;
-u32 count = 3;
-s64 total = 40;
+s1 small_signed;
+u4 count = 3;
+s8 total = 40;
 ```
 
-The width is part of the type name. Assignments use `=`:
+The byte width is part of the type name. Assignments use `=`:
 
 ```c
 total = total + 2;
 ```
 
-Integer arithmetic includes `+`, `-`, `*`, `/`, and `%`. Comparisons such as `==`, `<`, and `>=` produce a one-bit `u1` result.
+Integer arithmetic includes `+`, `-`, `*`, `/`, and `%`. Comparisons such as
+`==`, `<`, and `>=` produce a one-byte `u1` result.
 
 ## 5. Add decisions and loops
 
@@ -88,7 +90,7 @@ if (total == 42) {
 A `for` loop has initialization, condition, and increment sections:
 
 ```c
-for (s64 i = 0; i < 3; i = i + 1) {
+for (s8 i = 0; i < 3; i = i + 1) {
     total = total + i;
 }
 ```
@@ -98,7 +100,7 @@ for (s64 i = 0; i < 3; i = i + 1) {
 Array indexing works directly:
 
 ```c
-s64 values[3];
+s8 values[3];
 values[0] = 10;
 values[1] = 20;
 ```
@@ -106,19 +108,19 @@ values[1] = 20;
 Arrays do not implicitly convert to pointers. Take an element's address explicitly:
 
 ```c
-s64 *pointer;
+s8 *pointer;
 pointer = &values[0];
 *pointer = *pointer + 1;
 ```
 
-Pointer arithmetic scales by the size of the pointed-to type. For example, `pointer + 1` addresses the next `s64`, not the next byte.
+Pointer arithmetic scales by the size of the pointed-to type. For example, `pointer + 1` addresses the next `s8`, not the next byte.
 
 ## 7. Define a struct
 
 ```c
 struct Point {
-    s64 x;
-    s64 y;
+    s8 x;
+    s8 y;
 };
 
 struct Point point;
@@ -140,7 +142,7 @@ Every `.lowc` file can be imported. For example, if `math.lowc` defines `add`, a
 #include "math.lowc" : "add";
 
 void entrypoint(void) {
-    s64 result = add(20, 22);
+    s8 result = add(20, 22);
     return;
 }
 ```

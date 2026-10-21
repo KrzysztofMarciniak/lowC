@@ -1,9 +1,9 @@
 struct Point {
-s64 x;
-s64 y;
+s8 x;
+s8 y;
 };
 
-s64 main(void) {
+s8 main(void) {
 struct Point points[3];
 
 points[0].x = 10;

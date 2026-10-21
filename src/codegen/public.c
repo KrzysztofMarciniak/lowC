@@ -282,11 +282,11 @@ codegen_emit_process_args_bridge(
     if (
         !argc_global ||
         !argv_global ||
-        strcmp(argc_global->variable.type, "u64") != 0 ||
+        strcmp(argc_global->variable.type, "u8") != 0 ||
         argc_global->variable.pointer_depth != 0 ||
         argc_global->variable.array_length != NULL ||
         argc_global->variable.value != NULL ||
-        strcmp(argv_global->variable.type, "u8") != 0 ||
+        strcmp(argv_global->variable.type, "u1") != 0 ||
         argv_global->variable.pointer_depth != 2 ||
         argv_global->variable.array_length != NULL ||
         argv_global->variable.value != NULL

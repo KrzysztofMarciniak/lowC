@@ -3,9 +3,6 @@ void test_unsigned(void) {
     u2 b = 2;
     u4 c = 4;
     u8 d = 8;
-    u16 e = 16;
-    u32 f = 32;
-    u64 g = 64;
     return;
 }
 
@@ -14,8 +11,19 @@ void test_signed(void) {
     s2 b = 2;
     s4 c = 4;
     s8 d = 8;
-    s16 e = 16;
-    s32 f = 32;
-    s64 g = 64;
     return;
+}
+
+u8 test_widths(void) {
+    u1 bytes[2];
+    u2 words[2];
+    u4 double_words[2];
+    u8 quad_words[2];
+
+    bytes[1] = 1;
+    words[1] = 2;
+    double_words[1] = 4;
+    quad_words[1] = 8;
+
+    return bytes[1] + words[1] + double_words[1] + quad_words[1];
 }

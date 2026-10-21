@@ -183,17 +183,11 @@ semantic_expression_is_integer(
         case SEMANTIC_TYPE_U2:
         case SEMANTIC_TYPE_U4:
         case SEMANTIC_TYPE_U8:
-        case SEMANTIC_TYPE_U16:
-        case SEMANTIC_TYPE_U32:
-        case SEMANTIC_TYPE_U64:
 
         case SEMANTIC_TYPE_S1:
         case SEMANTIC_TYPE_S2:
         case SEMANTIC_TYPE_S4:
         case SEMANTIC_TYPE_S8:
-        case SEMANTIC_TYPE_S16:
-        case SEMANTIC_TYPE_S32:
-        case SEMANTIC_TYPE_S64:
 
             return 1;
 
@@ -292,7 +286,7 @@ semantic_check_binary(
                 semantic_expression_is_integer(left_type) &&
                 semantic_expression_is_integer(right_type)
             )
-                result = semantic_type_builtin("s64");
+                result = semantic_type_builtin("s8");
 
             else if (
                 left_type->kind == SEMANTIC_TYPE_POINTER &&
@@ -315,7 +309,7 @@ semantic_check_binary(
                 semantic_expression_is_integer(left_type) &&
                 semantic_expression_is_integer(right_type)
             )
-                result = semantic_type_builtin("s64");
+                result = semantic_type_builtin("s8");
 
             else if (
                 left_type->kind == SEMANTIC_TYPE_POINTER &&
@@ -331,7 +325,7 @@ semantic_check_binary(
                 /*
                  * Pointer difference, in elements.
                  */
-                result = semantic_type_builtin("s64");
+                result = semantic_type_builtin("s8");
 
             break;
 
@@ -344,7 +338,7 @@ semantic_check_binary(
                 semantic_expression_is_integer(left_type) &&
                 semantic_expression_is_integer(right_type)
             )
-                result = semantic_type_builtin("s64");
+                result = semantic_type_builtin("s8");
 
             break;
 
@@ -1048,7 +1042,7 @@ semantic_check_expression(
         {
             semantic_type *result;
 
-            result = semantic_type_builtin("s64");
+            result = semantic_type_builtin("s8");
 
             if (result == NULL)
                 *error_text = semantic_strdup("out of memory");
@@ -1061,7 +1055,7 @@ semantic_check_expression(
             semantic_type *element;
             semantic_type *result;
 
-            element = semantic_type_builtin("u8");
+            element = semantic_type_builtin("u1");
             if (element == NULL)
             {
                 *error_text = semantic_strdup("out of memory");

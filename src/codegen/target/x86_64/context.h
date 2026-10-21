@@ -38,7 +38,7 @@ typedef struct codegen_x86_64_local
      *
      * Example:
      *
-     *     s64
+     *     s8
      */
     char *type;
 
@@ -48,9 +48,9 @@ typedef struct codegen_x86_64_local
      *
      * Example:
      *
-     *     s64       -> 0
-     *     s64 *     -> 1
-     *     s64 **    -> 2
+     *     s8       -> 0
+     *     s8 *     -> 1
+     *     s8 **    -> 2
      */
     unsigned long pointer_depth;
 

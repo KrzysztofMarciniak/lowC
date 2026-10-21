@@ -1,6 +1,6 @@
-s64 main(void) {
-    s64 a = 10;
-    s64 b = 20;
+s8 main(void) {
+    s8 a = 10;
+    s8 b = 20;
     u1 a_eq_b = a == b;
     u1 a_ne_b = a != b;
     u1 a_lt_b = a < b;

@@ -1,4 +1,4 @@
-s64 main(void) {
+s8 main(void) {
     u1 a = 1;
     u1 b = 0;
     u1 x = !a;

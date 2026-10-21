@@ -189,12 +189,12 @@ codegen_x86_64_expression_type(
             }
 
         case AST_INTEGER:
-            *type = "s64";
+            *type = "s8";
             *pointer_depth = 0;
             return 1;
 
         case AST_STRING:
-            *type = "u8";
+            *type = "u1";
             *pointer_depth = 1;
             return 1;
 
@@ -260,7 +260,7 @@ codegen_x86_64_expression_type(
                     return 1;
                 }
             }
-            *type = "s64";
+            *type = "s8";
             *pointer_depth = 0;
             return 1;
 

@@ -1,7 +1,7 @@
-s64 main(void) {
-    s64 a = 10;
-    s64 b = 3;
-    s64 result = a + b;
+s8 main(void) {
+    s8 a = 10;
+    s8 b = 3;
+    s8 result = a + b;
     result = a - b;
     result = a * b;
     result = a / b;

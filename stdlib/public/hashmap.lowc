@@ -1,15 +1,15 @@
 #include "memory.lowc" : "alloc", "dealloc";
 
 struct HashMap {
-    u64 *keys;
-    u64 *values;
-    u8 *states;
-    u64 capacity;
-    u64 count;
+    u8 *keys;
+    u8 *values;
+    u1 *states;
+    u8 capacity;
+    u8 count;
 };
 
-u64 hashmap_index(u64 key, u64 capacity) {
-    u64 index;
+u8 hashmap_index(u8 key, u8 capacity) {
+    u8 index;
 
     asm(
         "xor rdx, rdx\ndiv %2\nmov %0, rdx"
@@ -23,12 +23,12 @@ u64 hashmap_index(u64 key, u64 capacity) {
 
 void hashmap_place(
     struct HashMap *map,
-    u64 key,
-    u64 value
+    u8 key,
+    u8 value
 ) {
-    u64 index;
-    u64 probes;
-    u64 first_deleted;
+    u8 index;
+    u8 probes;
+    u8 first_deleted;
     u1 found;
 
     index = hashmap_index(key, map->capacity);
@@ -69,12 +69,12 @@ void hashmap_place(
     map->states[index] = 1;
 }
 
-void hashmap_resize(struct HashMap *map, u64 capacity) {
-    u64 *old_keys;
-    u64 *old_values;
-    u8 *old_states;
-    u64 old_capacity;
-    u64 index;
+void hashmap_resize(struct HashMap *map, u8 capacity) {
+    u8 *old_keys;
+    u8 *old_values;
+    u1 *old_states;
+    u8 old_capacity;
+    u8 index;
 
     old_keys = map->keys;
     old_values = map->values;
@@ -106,8 +106,8 @@ void hashmap_resize(struct HashMap *map, u64 capacity) {
     dealloc(old_states);
 }
 
-void hashmap_init(struct HashMap *map, u64 capacity) {
-    u64 index;
+void hashmap_init(struct HashMap *map, u8 capacity) {
+    u8 index;
 
     if (capacity < 8) {
         capacity = 8;
@@ -124,7 +124,7 @@ void hashmap_init(struct HashMap *map, u64 capacity) {
     }
 }
 
-void hashmap_set(struct HashMap *map, u64 key, u64 value) {
+void hashmap_set(struct HashMap *map, u8 key, u8 value) {
     if ((map->count + 1) * 4 >= map->capacity * 3) {
         hashmap_resize(map, map->capacity * 2);
     }
@@ -132,9 +132,9 @@ void hashmap_set(struct HashMap *map, u64 key, u64 value) {
     hashmap_place(map, key, value);
 }
 
-u1 hashmap_get(struct HashMap *map, u64 key, u64 *value) {
-    u64 index;
-    u64 probes;
+u1 hashmap_get(struct HashMap *map, u8 key, u8 *value) {
+    u8 index;
+    u8 probes;
     u1 found;
 
     index = hashmap_index(key, map->capacity);
@@ -159,9 +159,9 @@ u1 hashmap_get(struct HashMap *map, u64 key, u64 *value) {
     return found;
 }
 
-u1 hashmap_remove(struct HashMap *map, u64 key) {
-    u64 index;
-    u64 probes;
+u1 hashmap_remove(struct HashMap *map, u8 key) {
+    u8 index;
+    u8 probes;
     u1 found;
 
     index = hashmap_index(key, map->capacity);

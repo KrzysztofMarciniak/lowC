@@ -1,18 +1,18 @@
 #include "../internal/string/main.lowc" : "__lowc_strlen";
 #include "memory.lowc" : "alloc";
 
-u64 strlen(u8 *data) {
+u8 strlen(u1 *data) {
     return __lowc_strlen(data);
 }
 
-u1 parse_u64(u8 *text, u64 *result) {
-    u8 *maximum;
-    u64 length;
-    u64 first_significant;
-    u64 significant_length;
-    u64 index;
-    u64 parsed;
-    s64 comparison;
+u1 parse_u64(u1 *text, u8 *result) {
+    u1 *maximum;
+    u8 length;
+    u8 first_significant;
+    u8 significant_length;
+    u8 index;
+    u8 parsed;
+    s8 comparison;
 
     maximum = "18446744073709551615";
     length = 0;
@@ -69,8 +69,8 @@ u1 parse_u64(u8 *text, u64 *result) {
     return 1;
 }
 
-s64 strcmp(u8 *left, u8 *right) {
-    u64 index;
+s8 strcmp(u1 *left, u1 *right) {
+    u8 index;
 
     for (
         index = 0;
@@ -90,9 +90,9 @@ s64 strcmp(u8 *left, u8 *right) {
     return 0;
 }
 
-u8 *strcpy(u8 *destination, u8 *source) {
-    u8 *result;
-    u64 index;
+u1 *strcpy(u1 *destination, u1 *source) {
+    u1 *result;
+    u8 index;
 
     result = destination;
 
@@ -104,10 +104,10 @@ u8 *strcpy(u8 *destination, u8 *source) {
     return result;
 }
 
-u8 *strcat(u8 *destination, u8 *source) {
-    u8 *result;
-    u64 destination_length;
-    u64 source_index;
+u1 *strcat(u1 *destination, u1 *source) {
+    u1 *result;
+    u8 destination_length;
+    u8 source_index;
 
     result = destination;
 
@@ -127,10 +127,10 @@ u8 *strcat(u8 *destination, u8 *source) {
     return result;
 }
 
-u8 *strdup(u8 *source) {
-    u8 *result;
-    u64 length;
-    u64 index;
+u1 *strdup(u1 *source) {
+    u1 *result;
+    u8 length;
+    u8 index;
 
     length = strlen(source);
     result = alloc(length + 1);

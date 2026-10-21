@@ -2,7 +2,7 @@ void foo(void) {
     return;
 }
 
-s64 main(void) {
+s8 main(void) {
     foo();
     return 0;
 }

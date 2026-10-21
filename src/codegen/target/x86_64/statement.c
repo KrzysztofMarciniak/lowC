@@ -318,9 +318,9 @@ emit_expression_source(
  * Examples:
  *
  *     u1  -> mov BYTE PTR [rbp-8], al
- *     u16 -> mov WORD PTR [rbp-8], ax
- *     u32 -> mov DWORD PTR [rbp-8], eax
- *     u64 -> mov QWORD PTR [rbp-8], rax
+ *     u2 -> mov WORD PTR [rbp-8], ax
+ *     u4 -> mov DWORD PTR [rbp-8], eax
+ *     u8 -> mov QWORD PTR [rbp-8], rax
  *
  * The x86-64 register returned by codegen_x86_64_type_register()
  * contains the low part of rax with the correct width.
@@ -1153,11 +1153,11 @@ codegen_x86_64_statement(
          *
          * Example:
          *
-         *     s64 x;
+         *     s8 x;
          *
          * or:
          *
-         *     s64 y = 42;
+         *     s8 y = 42;
          */
         case AST_VARIABLE_DECLARATION:
         {

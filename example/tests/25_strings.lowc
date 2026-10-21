@@ -1,4 +1,4 @@
-void accept(u8 *bytes) {
+void accept(u1 *bytes) {
     return;
 }
 

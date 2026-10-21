@@ -1,3 +1,3 @@
-s64 dependency_value(void) {
+s8 dependency_value(void) {
     return 5;
 }

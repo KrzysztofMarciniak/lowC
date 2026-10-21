@@ -1,6 +1,6 @@
-s64 main(void) {
-    s64 x = 10;
-    s64 *p;
+s8 main(void) {
+    s8 x = 10;
+    s8 *p;
     p = &x;
     *p = 42;
     return *p;

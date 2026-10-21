@@ -1,5 +1,5 @@
-s64 main(void) {
-    s64 values[5];
+s8 main(void) {
+    s8 values[5];
     values[0] = 10;
     values[1] = 20;
     values[2] = 30;

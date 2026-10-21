@@ -397,7 +397,7 @@ parser_parse_type(
     /*
      * Built-in types:
      *
-     *     s64
+     *     s8
      *     void
      */
     if (
