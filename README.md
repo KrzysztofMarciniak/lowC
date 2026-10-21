@@ -315,6 +315,41 @@ void entrypoint(void) {
 
 Unlike C, lowC does not use `main()` as the program entrypoint.
 
+### Calling C functions
+
+Declare a C function with a `foreign c` prototype. The compiler checks calls
+against the prototype and emits a call to the matching C symbol; it does not
+parse C headers or compile C source files:
+
+```c
+foreign c s4 puts(u1 *text);
+
+void entrypoint(void) {
+    puts("Hello from C");
+    return;
+}
+```
+
+Compile C sources separately into a library or object file, then pass its
+library search path and name to lowC:
+
+```sh
+build/lowc -foreign c=cc -L/path/to/libraries -lmylibrary \
+    -o program program.lowc
+```
+
+`-foreign <language>=<driver>` selects the assembler/linker driver for that
+foreign language; for example, `-foreign c=clang`. If no C driver is specified,
+lowC uses `CC`, or `cc` by default. `-L<path>` and `-l<name>` are passed to that
+driver. The mapping syntax is generic, but only the C ABI is currently
+supported.
+
+The current C ABI support targets x86-64 System V and accepts fixed-argument
+integer and pointer parameters/results, up to six parameters. C declarations
+must use compatible byte-width types (`u1`/`s1` through `u8`/`s8`) and pointer
+types. Structs passed or returned by value, variadic functions, and automatic
+C-header parsing are not supported.
+
 ---
 
 ## Control Flow

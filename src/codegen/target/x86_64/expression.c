@@ -1313,6 +1313,55 @@ emit_call(
                 "    add rsp, 8\n"
             );
         }
+
+        {
+            const char *return_type;
+            unsigned long return_pointer_depth;
+
+            if (
+                codegen_x86_64_expression_type(
+                    context,
+                    expression,
+                    &return_type,
+                    &return_pointer_depth
+                ) &&
+                return_pointer_depth == 0
+            ) {
+                unsigned long return_size =
+                    codegen_x86_64_type_size(return_type, 0);
+                int is_signed =
+                    codegen_x86_64_type_signed(return_type, 0);
+
+                switch (return_size) {
+                    case 1:
+                        codegen_output_write(
+                            context->output,
+                            is_signed
+                                ? "    movsx rax, al\n"
+                                : "    movzx rax, al\n"
+                        );
+                        break;
+
+                    case 2:
+                        codegen_output_write(
+                            context->output,
+                            is_signed
+                                ? "    movsx rax, ax\n"
+                                : "    movzx rax, ax\n"
+                        );
+                        break;
+
+                    case 4:
+                        codegen_output_write(
+                            context->output,
+                            is_signed
+                                ? "    movsxd rax, eax\n"
+                                : "    mov eax, eax\n"
+                        );
+                        break;
+                }
+            }
+        }
     }
 }
 

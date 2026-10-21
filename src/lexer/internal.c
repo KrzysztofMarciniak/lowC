@@ -288,6 +288,9 @@ lexer_keyword(
     if (strcmp(value, "asm") == 0)
         return TOKEN_ASM;
 
+    if (strcmp(value, "foreign") == 0)
+        return TOKEN_FOREIGN;
+
     return TOKEN_IDENTIFIER;
 }
 

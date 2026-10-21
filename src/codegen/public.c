@@ -348,10 +348,15 @@ codegen_generate_node(
                 i < node->program.functions.count;
                 i++
             ){
+                ast *function = node->program.functions.values[i];
+
+                if (function->function.is_foreign)
+                    continue;
+
                 if (
                     codegen_generate_node(
                         context,
-                        node->program.functions.values[i]
+                        function
                     )
                 ){
                     return 1;
@@ -441,6 +446,9 @@ codegen_generate_program(
         ast *function = tree->program.functions.values[i];
 
         if (strcmp(function->function.name, "entrypoint") == 0) {
+            if (function->function.is_foreign)
+                continue;
+
             if (entrypoint != NULL) {
                 codegen_fail(context, "program must define exactly one entrypoint");
                 return 1;

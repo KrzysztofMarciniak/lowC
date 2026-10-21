@@ -100,6 +100,101 @@ then
     exit 1
 fi
 
+cat >"$TEMP_DIR/foreign-fixture.c" <<'EOF'
+#include <stdint.h>
+
+uint64_t lowc_foreign_add(uint64_t left, uint64_t right)
+{
+    return left + right;
+}
+
+uint64_t lowc_foreign_length(const unsigned char *text)
+{
+    uint64_t length = 0;
+
+    while (text[length] != 0)
+        length++;
+
+    return length;
+}
+
+const unsigned char *lowc_foreign_identity(const unsigned char *text)
+{
+    return text;
+}
+
+uint8_t lowc_foreign_unsigned_byte(void)
+{
+    return 200;
+}
+
+int8_t lowc_foreign_signed_byte(void)
+{
+    return -7;
+}
+EOF
+
+if ! cc -c "$TEMP_DIR/foreign-fixture.c" \
+    -o "$TEMP_DIR/foreign-fixture.o" ||
+   ! ar rcs "$TEMP_DIR/liblowc_foreign_fixture.a" \
+        "$TEMP_DIR/foreign-fixture.o"
+then
+    echo "FAIL [foreign C] could not build fixture library"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/foreign-caller.lowc" <<'EOF'
+foreign c u8 lowc_foreign_add(u8 left, u8 right);
+foreign c u8 lowc_foreign_length(u1 *text);
+foreign c u1 *lowc_foreign_identity(u1 *text);
+foreign c u1 lowc_foreign_unsigned_byte(void);
+foreign c s1 lowc_foreign_signed_byte(void);
+foreign c s4 puts(u1 *text);
+
+void entrypoint(void) {
+    if (
+        lowc_foreign_add(20, 22) == 42 &&
+        lowc_foreign_length(
+            lowc_foreign_identity("C ABI")
+        ) == 5 &&
+        lowc_foreign_unsigned_byte() == 200 &&
+        lowc_foreign_signed_byte() == -7
+    ) {
+        puts("C interoperability works");
+    }
+    return;
+}
+EOF
+
+if ! CC=lowc-invalid-cc "$BIN" \
+    -foreign c=cc \
+    "-L$TEMP_DIR" \
+    -llowc_foreign_fixture \
+    -o "$TEMP_DIR/foreign-caller" \
+    "$TEMP_DIR/foreign-caller.lowc" ||
+   ! "$TEMP_DIR/foreign-caller" >"$TEMP_DIR/foreign-caller.out" ||
+   ! printf 'C interoperability works\n' \
+        | cmp -s - "$TEMP_DIR/foreign-caller.out"
+then
+    echo "FAIL [foreign C] C library calls or linker driver selection failed"
+    cat "$TEMP_DIR/foreign-caller.out"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/unsupported-foreign.lowc" <<'EOF'
+foreign forth u8 unsupported(void);
+void entrypoint(void) {
+    return;
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/unsupported-foreign.lowc" \
+    >"$TEMP_DIR/unsupported-foreign.out" 2>&1
+then
+    echo "FAIL [foreign C] unsupported foreign ABI was accepted"
+    exit 1
+fi
+
 cat >"$TEMP_DIR/format-input.lowc" <<'EOF'
 #include "z.lowc" : "z";
 #include "a.lowc" : "a";

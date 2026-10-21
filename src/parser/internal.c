@@ -202,6 +202,9 @@ parser_token_name(
         case TOKEN_ASM:
             return "'asm'";
 
+        case TOKEN_FOREIGN:
+            return "'foreign'";
+
         case TOKEN_IF:
             return "'if'";
 
@@ -1021,7 +1024,30 @@ parser_parse_function_or_global(
 {
     token *name;
     char *type;
+    char *foreign_language;
     unsigned long pointer_depth;
+    int is_foreign;
+
+    foreign_language = NULL;
+    is_foreign = parser_match(state, TOKEN_FOREIGN);
+
+    if (is_foreign) {
+        token *language = parser_current(state);
+
+        if (language == NULL || language->type != TOKEN_IDENTIFIER) {
+            parser_set_error(
+                state,
+                "expected a language name after 'foreign'."
+            );
+            return NULL;
+        }
+
+        foreign_language = parser_copy_string(language->value);
+        if (foreign_language == NULL)
+            return NULL;
+
+        parser_advance(state);
+    }
 
     type =
         parser_parse_type(
@@ -1029,8 +1055,10 @@ parser_parse_function_or_global(
             &pointer_depth
         );
 
-    if (type == NULL)
+    if (type == NULL) {
+        free(foreign_language);
         return NULL;
+    }
 
     name =
         parser_current(state);
@@ -1043,6 +1071,7 @@ parser_parse_function_or_global(
         );
 
         free(type);
+        free(foreign_language);
         return NULL;
     }
 
@@ -1054,6 +1083,7 @@ parser_parse_function_or_global(
         );
 
         free(type);
+        free(foreign_language);
         return NULL;
     }
 
@@ -1075,6 +1105,7 @@ parser_parse_function_or_global(
         if (node == NULL)
         {
             free(type);
+            free(foreign_language);
             return NULL;
         }
 
@@ -1083,6 +1114,8 @@ parser_parse_function_or_global(
 
         node->function.return_pointer_depth =
             pointer_depth;
+        node->function.is_foreign = is_foreign;
+        node->function.foreign_language = foreign_language;
 
         node->function.name =
             parser_copy_string(
@@ -1229,16 +1262,32 @@ parser_parse_function_or_global(
             }
         }
 
-        node->function.body =
-            parser_parse_block(state);
+        if (is_foreign) {
+            if (!parser_expect(state, TOKEN_SEMICOLON)) {
+                parser_free(node);
+                return NULL;
+            }
+        } else {
+            node->function.body =
+                parser_parse_block(state);
 
-        if (node->function.body == NULL)
-        {
-            parser_free(node);
-            return NULL;
+            if (node->function.body == NULL) {
+                parser_free(node);
+                return NULL;
+            }
         }
 
         return node;
+    }
+
+    if (is_foreign) {
+        parser_set_error(
+            state,
+            "foreign declarations must declare a function."
+        );
+        free(type);
+        free(foreign_language);
+        return NULL;
     }
 
     {
@@ -3127,6 +3176,7 @@ parser_free(
         case AST_FUNCTION:
             free(node->function.return_type);
             free(node->function.name);
+            free(node->function.foreign_language);
 
             parser_free_list(
                 &node->function.parameters

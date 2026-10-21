@@ -21,6 +21,7 @@ typedef enum token_type
     TOKEN_RETURN,
     TOKEN_STRUCT,
     TOKEN_ASM,
+    TOKEN_FOREIGN,
 
     TOKEN_INCLUDE,
 

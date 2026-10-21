@@ -472,6 +472,14 @@ parser_print_ast_node(
 
             parser_print_indent(depth + 1);
             printf(
+                "foreign_language: %s\n",
+                tree->function.foreign_language != NULL
+                    ? tree->function.foreign_language
+                    : "(none)"
+            );
+
+            parser_print_indent(depth + 1);
+            printf(
                 "return_type: %s\n",
                 tree->function.return_type != NULL
                     ? tree->function.return_type

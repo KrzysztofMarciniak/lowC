@@ -28,6 +28,38 @@ semantic_strdup(
     return copy;
 }
 
+static int
+semantic_c_abi_integer_type(
+    const char *name
+)
+{
+    return
+        strcmp(name, "u1") == 0 ||
+        strcmp(name, "u2") == 0 ||
+        strcmp(name, "u4") == 0 ||
+        strcmp(name, "u8") == 0 ||
+        strcmp(name, "s1") == 0 ||
+        strcmp(name, "s2") == 0 ||
+        strcmp(name, "s4") == 0 ||
+        strcmp(name, "s8") == 0;
+}
+
+static int
+semantic_c_abi_value_type(
+    const char *name,
+    unsigned long pointer_depth,
+    int allow_void
+)
+{
+    if (pointer_depth != 0)
+        return 1;
+
+    if (allow_void && strcmp(name, "void") == 0)
+        return 1;
+
+    return semantic_c_abi_integer_type(name);
+}
+
 
 /**
  * @brief Check one function body against its already-registered signature.
@@ -296,6 +328,63 @@ semantic(
 
         function = parser.tree->program.functions.values[i];
 
+        if (function->function.is_foreign) {
+            if (
+                function->function.foreign_language == NULL ||
+                strcmp(
+                    function->function.foreign_language,
+                    "c"
+                ) != 0
+            ) {
+                result = semantic_error(
+                    function,
+                    "only the C foreign ABI is currently supported"
+                );
+                goto cleanup;
+            }
+
+            if (function->function.parameters.count > 6) {
+                result = semantic_error(
+                    function,
+                    "C foreign functions support at most six parameters"
+                );
+                goto cleanup;
+            }
+
+            if (!semantic_c_abi_value_type(
+                    function->function.return_type,
+                    function->function.return_pointer_depth,
+                    1
+                )) {
+                result = semantic_error(
+                    function,
+                    "C foreign return type must be an integer or pointer"
+                );
+                goto cleanup;
+            }
+
+            for (
+                unsigned long parameter_index = 0;
+                parameter_index < function->function.parameters.count;
+                parameter_index++
+            ) {
+                ast *parameter =
+                    function->function.parameters.values[parameter_index];
+
+                if (!semantic_c_abi_value_type(
+                        parameter->parameter.type,
+                        parameter->parameter.pointer_depth,
+                        0
+                    )) {
+                    result = semantic_error(
+                        parameter,
+                        "C foreign parameters must be integers or pointers"
+                    );
+                    goto cleanup;
+                }
+            }
+        }
+
         signature = semantic_function_create(
             function,
             context.structs,
@@ -532,6 +621,9 @@ semantic(
         ast *function;
 
         function = parser.tree->program.functions.values[i];
+
+        if (function->function.is_foreign)
+            continue;
 
         error_text = NULL;
 

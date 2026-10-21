@@ -101,6 +101,31 @@ main_arg_handler_split(
         }
 
         if (!end_of_flags &&
+            strcmp(argument, "-foreign") == 0)
+        {
+            main_arg_handler_rotate(
+                argv,
+                flag_position,
+                position
+            );
+
+            flag_position++;
+            (*flag_count)++;
+
+            main_arg_handler_rotate(
+                argv,
+                flag_position,
+                position + 1
+            );
+
+            flag_position++;
+            (*flag_count)++;
+            position++;
+
+            continue;
+        }
+
+        if (!end_of_flags &&
             main_arg_handler_is_flag(argument))
         {
             main_arg_handler_rotate(
@@ -172,7 +197,23 @@ main_arg_handler_internal(
             };
         }
 
+        if (
+            !end_of_flags &&
+            strcmp(argv[index], "-foreign") == 0 &&
+            index + 1 >= argc
+        )
+        {
+            return (main_arg_handler_result) {
+                .error = 1,
+                .error_text = "missing mapping after -foreign."
+            };
+        }
+
         if (!end_of_flags && strcmp(argv[index], "-o") == 0) {
+            index++;
+        }
+
+        if (!end_of_flags && strcmp(argv[index], "-foreign") == 0) {
             index++;
         }
     }

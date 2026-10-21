@@ -42,11 +42,15 @@ output_error(
 static output_result
 output_build_executable(
     const char *assembly,
-    const char *output_path
+    const char *output_path,
+    const flag_handler_options *options
 )
 {
     char temporary_path[] = "/tmp/lowc-XXXXXX";
     const char *compiler;
+    char **compiler_arguments;
+    size_t argument_index;
+    size_t argument_count;
     size_t remaining;
     const char *cursor;
     int descriptor;
@@ -83,28 +87,51 @@ output_build_executable(
         return output_error("failed to close temporary assembly file");
     }
 
+    compiler = options->c_driver;
+    if (compiler == NULL || compiler[0] == '\0') {
+        compiler = getenv("CC");
+    }
+    if (compiler == NULL || compiler[0] == '\0') {
+        compiler = "cc";
+    }
+
+    argument_count =
+        7 + (size_t)options->linker_argument_count;
+    compiler_arguments = calloc(
+        argument_count,
+        sizeof(*compiler_arguments)
+    );
+    if (compiler_arguments == NULL) {
+        unlink(temporary_path);
+        return output_error("failed to allocate assembler and linker arguments");
+    }
+
+    compiler_arguments[0] = (char *)compiler;
+    compiler_arguments[1] = "-x";
+    compiler_arguments[2] = "assembler";
+    compiler_arguments[3] = temporary_path;
+    compiler_arguments[4] = "-o";
+    compiler_arguments[5] = (char *)output_path;
+    argument_index = 6;
+    for (
+        int index = 0;
+        index < options->linker_argument_count;
+        index++
+    ) {
+        compiler_arguments[argument_index++] =
+            options->linker_arguments[index];
+    }
+    compiler_arguments[argument_index] = NULL;
+
     child = fork();
     if (child < 0) {
+        free(compiler_arguments);
         unlink(temporary_path);
         return output_error("failed to start assembler and linker");
     }
 
     if (child == 0) {
-        compiler = getenv("CC");
-        if (compiler == NULL || compiler[0] == '\0') {
-            compiler = "cc";
-        }
-
-        execlp(
-            compiler,
-            compiler,
-            "-x",
-            "assembler",
-            temporary_path,
-            "-o",
-            output_path,
-            (char *)NULL
-        );
+        execvp(compiler, compiler_arguments);
         _exit(127);
     }
 
@@ -112,6 +139,7 @@ output_build_executable(
         waited = waitpid(child, &status, 0);
     } while (waited < 0 && errno == EINTR);
 
+    free(compiler_arguments);
     unlink(temporary_path);
 
     if (waited < 0) {
@@ -174,7 +202,8 @@ output(
         codegen.assembly,
         options->output_path != NULL
             ? options->output_path
-            : "a.out"
+            : "a.out",
+        options
     );
 }
 

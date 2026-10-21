@@ -3,6 +3,12 @@
 
 #include "main_arg_handler/public.h"
 
+typedef struct foreign_driver_mapping
+{
+    char *language;
+    char *driver;
+} foreign_driver_mapping;
+
 typedef enum flag_target
 {
     FLAG_TARGET_X86_64
@@ -21,6 +27,11 @@ typedef struct flag_handler_options
     int optimize;
     int executable;
     const char *output_path;
+    char **linker_arguments;
+    int linker_argument_count;
+    foreign_driver_mapping *foreign_drivers;
+    int foreign_driver_count;
+    char *c_driver;
 } flag_handler_options;
 
 typedef struct flag_handler_result
@@ -38,6 +49,11 @@ flag_handler(
 void
 flag_handler_handle_error(
     flag_handler_result result
+);
+
+void
+flag_handler_options_free(
+    flag_handler_options *options
 );
 
 void 

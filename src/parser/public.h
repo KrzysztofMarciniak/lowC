@@ -146,6 +146,8 @@ struct ast
             char *return_type;
             unsigned long return_pointer_depth;
             char *name;
+            int is_foreign;
+            char *foreign_language;
             ast_list parameters;
             ast *body;
         } function;

@@ -52,6 +52,7 @@ main(
     if (flag_result.options.help)
     {
         flag_handler_print_help(argv[0]);
+        flag_handler_options_free(&flag_result.options);
         return 0;
     }
 
@@ -64,12 +65,15 @@ main(
             "use --help for more information.\n"
         );
 
+        flag_handler_options_free(&flag_result.options);
         return 1;
     }
 
     if (flag_result.options.format)
     {
-        return formatter_run(files);
+        int format_result = formatter_run(files);
+        flag_handler_options_free(&flag_result.options);
+        return format_result;
     }
 
 
@@ -79,6 +83,7 @@ main(
     if (files_result.error)
     {
         files_handler_handle_error(files_result);
+        flag_handler_options_free(&flag_result.options);
         return 1;
     }
 
@@ -89,12 +94,14 @@ main(
     if (lexer_result.error)
     {
         lexer_handle_error(lexer_result);
+        flag_handler_options_free(&flag_result.options);
         return 1;
     }
 
     if (flag_result.options.tokens)
     {
         lexer_print_tokens(lexer_result);
+        flag_handler_options_free(&flag_result.options);
         return 0;
     }
 
@@ -105,12 +112,14 @@ main(
     if (parser_result.error)
     {
         parser_handle_error(parser_result);
+        flag_handler_options_free(&flag_result.options);
         return 1;
     }
 
     if (flag_result.options.ast)
     {
         parser_print_ast(parser_result.tree);
+        flag_handler_options_free(&flag_result.options);
         return 0;
     }
 
@@ -121,6 +130,7 @@ main(
     if (semantic_result.error)
     {
         semantic_handle_error(semantic_result);
+        flag_handler_options_free(&flag_result.options);
         return 1;
     }
 
@@ -134,6 +144,7 @@ main(
     if (codegen_result.error)
     {
         codegen_handle_error(codegen_result);
+        flag_handler_options_free(&flag_result.options);
         return 1;
     }
 
@@ -147,9 +158,10 @@ main(
     if (output_result.error)
     {
         output_handle_error(output_result);
+        flag_handler_options_free(&flag_result.options);
         return 1;
     }
 
-
+    flag_handler_options_free(&flag_result.options);
     return 0;
 }
