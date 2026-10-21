@@ -5,7 +5,7 @@ u8 strlen(u1 *data) {
     return __lowc_strlen(data);
 }
 
-u1 parse_u64(u1 *text, u8 *result) {
+u1 parse_u8(u1 *text, u8 *result) {
     u1 *maximum;
     u8 length;
     u8 first_significant;

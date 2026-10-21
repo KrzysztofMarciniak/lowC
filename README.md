@@ -425,7 +425,7 @@ preserving the required `void entrypoint(void)` signature:
 #include "/usr/local/share/lowc/public/args.lowc" :
     "args_count", "args_get";
 #include "/usr/local/share/lowc/public/print.lowc" :
-    "print", "print_u64";
+    "print", "print_u8";
 
 void entrypoint(void) {
     u8 count = args_count();
@@ -433,7 +433,7 @@ void entrypoint(void) {
     u1 *argument;
 
     print("args count = ");
-    print_u64(count);
+    print_u8(count);
     print("\n");
 
     for (index = 0; index < count; index = index + 1) {
@@ -458,18 +458,17 @@ helper, so output stops at the first NUL byte. `print` writes to standard
 output via the Linux x86-64 `write` syscall; it has no error return in this
 initial API.
 
-`print_u1`, `print_u2`, `print_u4`, `print_u8`, `print_u16`, `print_u32`, and
-`print_u64` print unsigned integers in decimal. `print_s1`, `print_s2`,
-`print_s4`, `print_s8`, `print_s16`, `print_s32`, and `print_s64` do the same
-for signed integers. Numeric print functions do not add a newline:
+`print_u1`, `print_u2`, `print_u4`, and `print_u8` print unsigned integers in
+decimal. `print_s1`, `print_s2`, `print_s4`, and `print_s8` do the same for
+signed integers. Numeric print functions do not add a newline:
 
 ```c
 #include "/usr/local/share/lowc/public/print.lowc" :
-    "print_u64", "print_s64", "print";
+    "print_u8", "print_s8", "print";
 
 void entrypoint(void) {
-    print_u64(42);
-    print_s64(-7);
+    print_u8(42);
+    print_s8(-7);
     print("\n");
 }
 ```
@@ -478,7 +477,7 @@ Use `strlen` directly by importing `string.lowc`:
 
 ```c
 #include "/usr/local/share/lowc/public/string.lowc" :
-    "strlen", "parse_u64", "strcmp", "strcpy", "strcat", "strdup";
+    "strlen", "parse_u8", "strcmp", "strcpy", "strcat", "strdup";
 #include "/usr/local/share/lowc/public/memory.lowc" : "dealloc";
 
 u8 string_example(void) {
@@ -489,7 +488,7 @@ u8 string_example(void) {
 }
 ```
 
-`parse_u64(text, &value)` returns true for a non-empty sequence of decimal
+`parse_u8(text, &value)` returns true for a non-empty sequence of decimal
 digits that fits in `u8`, and writes the parsed value only on success. It
 accepts leading zeroes but rejects signs, whitespace, other characters, and
 overflow.

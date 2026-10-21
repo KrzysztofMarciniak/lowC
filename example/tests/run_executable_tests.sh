@@ -350,21 +350,18 @@ fi
 
 cat >"$TEMP_DIR/standard-library-numbers.lowc" <<EOF
 #include "$TEMP_DIR/usr/local/share/lowc/public/print.lowc" :
-    "print",
-    "print_u1", "print_u2", "print_u4", "print_u8",
-    "print_u16", "print_u32", "print_u64",
-    "print_s1", "print_s2", "print_s4", "print_s8",
-    "print_s16", "print_s32", "print_s64";
-#include "$TEMP_DIR/usr/local/share/lowc/public/string.lowc" : "parse_u64";
+    "print", "print_u1", "print_u2", "print_u4", "print_u8",
+    "print_s1", "print_s2", "print_s4", "print_s8";
+#include "$TEMP_DIR/usr/local/share/lowc/public/string.lowc" : "parse_u8";
 
 u8 standard_library_numbers_test(void) {
     u8 value;
     s8 minimum;
 
-    if (!parse_u64("0", &value) || value != 0) {
+    if (!parse_u8("0", &value) || value != 0) {
         return 1;
     }
-    print_u64(value);
+    print_u8(value);
     print("|");
 
     print_u1(1);
@@ -375,33 +372,27 @@ u8 standard_library_numbers_test(void) {
     print("|");
     print_u8(8);
     print("|");
-    print_u16(16);
-    print("|");
-    print_u32(32);
-    print("|");
-    print_u64(64);
-    print("|");
 
-    if (!parse_u64("18446744073709551615", &value)) {
+    if (!parse_u8("18446744073709551615", &value)) {
         return 2;
     }
-    print_u64(value);
+    print_u8(value);
     print("|");
 
-    if (!parse_u64("00000000000000000042", &value) || value != 42) {
+    if (!parse_u8("00000000000000000042", &value) || value != 42) {
         return 3;
     }
 
-    if (parse_u64("", &value) || value != 42) {
+    if (parse_u8("", &value) || value != 42) {
         return 4;
     }
-    if (parse_u64("-1", &value) || value != 42) {
+    if (parse_u8("-1", &value) || value != 42) {
         return 5;
     }
-    if (parse_u64("12x", &value) || value != 42) {
+    if (parse_u8("12x", &value) || value != 42) {
         return 6;
     }
-    if (parse_u64("18446744073709551616", &value) || value != 42) {
+    if (parse_u8("18446744073709551616", &value) || value != 42) {
         return 7;
     }
 
@@ -413,16 +404,10 @@ u8 standard_library_numbers_test(void) {
     print("|");
     print_s8(-1);
     print("|");
-    print_s16(-1);
-    print("|");
-    print_s32(-1);
-    print("|");
-    print_s64(-1);
-    print("|");
     asm("mov %0, 0x8000000000000000" : "=rax"(minimum) : :);
-    print_s64(minimum);
+    print_s8(minimum);
     print("|");
-    print_s64(9223372036854775807);
+    print_s8(9223372036854775807);
     print("|done\n");
 
     return 0;
@@ -454,7 +439,7 @@ for mode in unoptimized optimized; do
             -o "$TEMP_DIR/numbers-$mode-program" ||
        ! "$TEMP_DIR/numbers-$mode-program" \
             >"$TEMP_DIR/numbers-$mode.out" ||
-       ! printf '0|1|2|4|8|16|32|64|18446744073709551615|-1|-1|-1|-1|-1|-1|-1|-9223372036854775808|9223372036854775807|done\n' \
+       ! printf '0|1|2|4|8|18446744073709551615|-1|-1|-1|-1|-9223372036854775808|9223372036854775807|done\n' \
             | cmp -s - "$TEMP_DIR/numbers-$mode.out"
     then
         echo "FAIL [standard library] $mode numeric printing or parsing was incorrect"
@@ -594,14 +579,14 @@ cat >"$TEMP_DIR/standard-library-args.lowc" <<EOF
 #include "$TEMP_DIR/usr/local/share/lowc/public/args.lowc" :
     "args_count", "args_get";
 #include "$TEMP_DIR/usr/local/share/lowc/public/print.lowc" :
-    "print", "print_u64";
+    "print", "print_u8";
 
 void entrypoint(void) {
     u8 count;
     u1 *argument;
 
     count = args_count();
-    print_u64(count);
+    print_u8(count);
     print("|");
 
     if (args_get(0, &argument)) {

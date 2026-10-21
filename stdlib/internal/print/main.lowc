@@ -18,7 +18,7 @@ void __lowc_write_stdout(u1 *data, u8 length) {
     return;
 }
 
-void __lowc_print_u64(u8 value) {
+void __lowc_print_u8(u8 value) {
     u1 digits[20];
     u8 index;
     u8 quotient;
@@ -48,7 +48,7 @@ void __lowc_print_u64(u8 value) {
     return;
 }
 
-void __lowc_print_s64(s8 value) {
+void __lowc_print_s8(s8 value) {
     u8 magnitude;
 
     if (value < 0) {
@@ -63,6 +63,6 @@ void __lowc_print_s64(s8 value) {
         magnitude = value;
     }
 
-    __lowc_print_u64(magnitude);
+    __lowc_print_u8(magnitude);
     return;
 }

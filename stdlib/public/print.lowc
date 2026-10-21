@@ -1,5 +1,5 @@
 #include "../internal/print/main.lowc" :
-    "__lowc_write_stdout", "__lowc_print_u64", "__lowc_print_s64";
+    "__lowc_write_stdout", "__lowc_print_u8", "__lowc_print_s8";
 #include "string.lowc" : "strlen";
 
 void print(u1 *data) {
@@ -8,71 +8,41 @@ void print(u1 *data) {
 }
 
 void print_u1(u1 value) {
-    __lowc_print_u64(value);
+    __lowc_print_u8(value);
     return;
 }
 
 void print_u2(u2 value) {
-    __lowc_print_u64(value);
+    __lowc_print_u8(value);
     return;
 }
 
 void print_u4(u4 value) {
-    __lowc_print_u64(value);
+    __lowc_print_u8(value);
     return;
 }
 
 void print_u8(u8 value) {
-    __lowc_print_u64(value);
-    return;
-}
-
-void print_u16(u2 value) {
-    __lowc_print_u64(value);
-    return;
-}
-
-void print_u32(u4 value) {
-    __lowc_print_u64(value);
-    return;
-}
-
-void print_u64(u8 value) {
-    __lowc_print_u64(value);
+    __lowc_print_u8(value);
     return;
 }
 
 void print_s1(s1 value) {
-    __lowc_print_s64(value);
+    __lowc_print_s8(value);
     return;
 }
 
 void print_s2(s2 value) {
-    __lowc_print_s64(value);
+    __lowc_print_s8(value);
     return;
 }
 
 void print_s4(s4 value) {
-    __lowc_print_s64(value);
+    __lowc_print_s8(value);
     return;
 }
 
 void print_s8(s8 value) {
-    __lowc_print_s64(value);
-    return;
-}
-
-void print_s16(s2 value) {
-    __lowc_print_s64(value);
-    return;
-}
-
-void print_s32(s4 value) {
-    __lowc_print_s64(value);
-    return;
-}
-
-void print_s64(s8 value) {
-    __lowc_print_s64(value);
+    __lowc_print_s8(value);
     return;
 }
