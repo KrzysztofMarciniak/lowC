@@ -555,6 +555,66 @@ then
     exit 1
 fi
 
+if ! "$BIN" --asm -debug "$SCRIPT_DIR/test_dead_code.lowc" \
+    >"$TEMP_DIR/dead-code-unoptimized.s" ||
+   ! "$BIN" --asm -optimize "$SCRIPT_DIR/test_dead_code.lowc" \
+    >"$TEMP_DIR/dead-code-optimized.s" ||
+   ! grep -q 'call dead_effect' "$TEMP_DIR/dead-code-unoptimized.s" ||
+   grep -q 'call dead_effect' "$TEMP_DIR/dead-code-optimized.s" ||
+   ! grep -q 'call live_effect' "$TEMP_DIR/dead-code-optimized.s"
+then
+    echo "FAIL [optimization] unreachable effectful block was not removed safely"
+    exit 1
+fi
+
+for mode in unoptimized optimized; do
+    if ! cc -x assembler "$TEMP_DIR/dead-code-$mode.s" -x c \
+        "$SCRIPT_DIR/test_dead_code_harness.c" \
+        -o "$TEMP_DIR/dead-code-$mode" ||
+       ! "$TEMP_DIR/dead-code-$mode"
+    then
+        echo "FAIL [optimization] $mode dead-code fixture changed runtime behavior"
+        exit 1
+    fi
+done
+
+cat >"$TEMP_DIR/pure-expression.lowc" <<'EOF'
+u1 expression_input = 42;
+
+void entrypoint(void) {
+    expression_input + 7;
+    return;
+}
+EOF
+
+if ! "$BIN" --asm -debug "$TEMP_DIR/pure-expression.lowc" \
+    >"$TEMP_DIR/pure-expression-unoptimized.s" ||
+   ! "$BIN" --asm -optimize "$TEMP_DIR/pure-expression.lowc" \
+    >"$TEMP_DIR/pure-expression-optimized.s" ||
+   ! grep -q 'push rax' "$TEMP_DIR/pure-expression-unoptimized.s" ||
+   grep -q 'push rax' "$TEMP_DIR/pure-expression-optimized.s"
+then
+    echo "FAIL [optimization] unused pure expression was not removed"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/trapping-expression.lowc" <<'EOF'
+u8 divisor = 0;
+
+void entrypoint(void) {
+    divisor / divisor;
+    return;
+}
+EOF
+
+if ! "$BIN" --asm -optimize "$TEMP_DIR/trapping-expression.lowc" \
+    >"$TEMP_DIR/trapping-expression-optimized.s" ||
+   ! grep -q 'idiv rcx' "$TEMP_DIR/trapping-expression-optimized.s"
+then
+    echo "FAIL [optimization] potentially trapping expression was removed"
+    exit 1
+fi
+
 cat >"$TEMP_DIR/constant-call.lowc" <<'EOF'
 u1 result_x = 0;
 u1 result_y = 0;
@@ -1203,7 +1263,7 @@ fi
 echo "ok   [modules] imported functions, structs, and globals assemble, link, and run"
 echo "ok   [modules] unimported functions, structs, and globals are rejected"
 echo "ok   [IR] unused imported declarations are pruned with transitive dependencies preserved"
-echo "ok   [optimization] constant folding and branch simplification work"
+echo "ok   [optimization] constant folding, branch simplification, and dead-code removal work"
 echo "ok   [executable] optimized and unoptimized output assembles, links, and runs"
 echo "ok   [standard library] installed print module writes exact output"
 echo "ok   [standard library] CLI arguments include argv[0] and are bounds checked"

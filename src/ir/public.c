@@ -3359,6 +3359,385 @@ ir_optimize_straight_line(
 }
 
 static int
+ir_value_is_pure(
+    const ir_function *function,
+    unsigned long value_id,
+    unsigned char *states
+)
+{
+    const ir_value *value;
+    int pure = 0;
+
+    if (value_id >= function->value_count) {
+        return 0;
+    }
+    if (states[value_id] != 0) {
+        return states[value_id] == 1;
+    }
+
+    value = &function->values[value_id];
+    states[value_id] = 2;
+    switch (value->opcode) {
+        case IR_VALUE_INTEGER:
+        case IR_VALUE_STRING:
+        case IR_VALUE_LOAD:
+            pure = 1;
+            break;
+
+        case IR_VALUE_UNARY:
+            if (
+                value->unary_operator == AST_UNARY_PLUS ||
+                value->unary_operator == AST_UNARY_MINUS ||
+                value->unary_operator == AST_UNARY_NOT
+            ) {
+                pure = ir_value_is_pure(
+                    function,
+                    value->left,
+                    states
+                );
+            }
+            break;
+
+        case IR_VALUE_BINARY:
+            if (
+                value->binary_operator != AST_BINARY_DIVIDE &&
+                value->binary_operator != AST_BINARY_MODULO
+            ) {
+                pure = ir_value_is_pure(
+                           function,
+                           value->left,
+                           states
+                       ) &&
+                    ir_value_is_pure(
+                        function,
+                        value->right,
+                        states
+                    );
+            }
+            break;
+
+        case IR_VALUE_CALL:
+        case IR_VALUE_INDEX:
+        case IR_VALUE_MEMBER:
+        case IR_VALUE_POINTER_MEMBER:
+            break;
+    }
+
+    states[value_id] = pure ? 1 : 2;
+    return pure;
+}
+
+static void
+ir_mark_value_tree(
+    const ir_function *function,
+    unsigned long value_id,
+    unsigned char *live_values
+)
+{
+    const ir_value *value;
+
+    if (
+        value_id >= function->value_count ||
+        live_values[value_id]
+    ) {
+        return;
+    }
+
+    live_values[value_id] = 1;
+    value = &function->values[value_id];
+    if (value->left != ULONG_MAX) {
+        ir_mark_value_tree(function, value->left, live_values);
+    }
+    if (value->right != ULONG_MAX) {
+        ir_mark_value_tree(function, value->right, live_values);
+    }
+    for (unsigned long index = 0;
+         index < value->argument_count;
+         index++)
+    {
+        ir_mark_value_tree(
+            function,
+            value->arguments[index],
+            live_values
+        );
+    }
+}
+
+static void
+ir_mark_instruction_values(
+    const ir_function *function,
+    const ir_instruction *instruction,
+    unsigned char *live_values
+)
+{
+    if (instruction->result_value != ULONG_MAX) {
+        ir_mark_value_tree(
+            function,
+            instruction->result_value,
+            live_values
+        );
+    }
+    if (instruction->left_value != ULONG_MAX) {
+        ir_mark_value_tree(
+            function,
+            instruction->left_value,
+            live_values
+        );
+    }
+    if (instruction->right_value != ULONG_MAX) {
+        ir_mark_value_tree(
+            function,
+            instruction->right_value,
+            live_values
+        );
+    }
+    for (unsigned long index = 0;
+         index < instruction->operand_count;
+         index++)
+    {
+        ir_mark_value_tree(
+            function,
+            instruction->operand_values[index],
+            live_values
+        );
+    }
+}
+
+static int
+ir_remove_unreachable_blocks(
+    ir_function *function
+)
+{
+    unsigned long block_count = function->block_count;
+    unsigned char *reachable;
+    unsigned long *worklist;
+    unsigned long *remapped_blocks;
+    unsigned long worklist_count = 0;
+    unsigned long reachable_count = 0;
+
+    if (block_count == 0) {
+        return 0;
+    }
+
+    reachable = calloc((size_t)block_count, sizeof(*reachable));
+    worklist = malloc(sizeof(*worklist) * (size_t)block_count);
+    remapped_blocks = malloc(
+        sizeof(*remapped_blocks) * (size_t)block_count
+    );
+    if (!reachable || !worklist || !remapped_blocks) {
+        free(reachable);
+        free(worklist);
+        free(remapped_blocks);
+        return 1;
+    }
+
+    reachable[0] = 1;
+    worklist[worklist_count++] = 0;
+    while (worklist_count != 0) {
+        unsigned long block_index = worklist[--worklist_count];
+        const ir_terminator *terminator =
+            &function->blocks[block_index].terminator;
+        unsigned long successors[2];
+        unsigned long successor_count = 0;
+
+        switch (terminator->kind) {
+            case IR_TERMINATOR_NONE:
+                break;
+            case IR_TERMINATOR_JUMP:
+                successors[successor_count++] = terminator->true_block;
+                break;
+            case IR_TERMINATOR_BRANCH:
+                successors[successor_count++] = terminator->true_block;
+                successors[successor_count++] = terminator->false_block;
+                break;
+        }
+
+        for (unsigned long index = 0;
+             index < successor_count;
+             index++)
+        {
+            unsigned long successor = successors[index];
+            if (successor >= block_count) {
+                free(reachable);
+                free(worklist);
+                free(remapped_blocks);
+                return 1;
+            }
+            if (!reachable[successor]) {
+                reachable[successor] = 1;
+                worklist[worklist_count++] = successor;
+            }
+        }
+    }
+
+    for (unsigned long index = 0; index < block_count; index++) {
+        if (reachable[index]) {
+            remapped_blocks[index] = reachable_count++;
+        } else {
+            remapped_blocks[index] = ULONG_MAX;
+        }
+    }
+
+    if (reachable_count == block_count) {
+        free(reachable);
+        free(worklist);
+        free(remapped_blocks);
+        return 0;
+    }
+
+    for (unsigned long index = 0; index < block_count; index++) {
+        ir_basic_block *block = &function->blocks[index];
+        if (reachable[index]) {
+            continue;
+        }
+        for (unsigned long instruction_index = 0;
+             instruction_index < block->instruction_count;
+             instruction_index++)
+        {
+            ir_instruction_free(&block->instructions[instruction_index]);
+        }
+        free(block->instructions);
+        *block = (ir_basic_block) {0};
+    }
+
+    unsigned long write_index = 0;
+    for (unsigned long read_index = 0;
+         read_index < block_count;
+         read_index++)
+    {
+        if (!reachable[read_index]) {
+            continue;
+        }
+        if (write_index != read_index) {
+            function->blocks[write_index] = function->blocks[read_index];
+            function->blocks[read_index] = (ir_basic_block) {0};
+        }
+        write_index++;
+    }
+    function->block_count = reachable_count;
+
+    for (unsigned long block_index = 0;
+         block_index < function->block_count;
+         block_index++)
+    {
+        ir_terminator *terminator =
+            &function->blocks[block_index].terminator;
+        if (terminator->kind == IR_TERMINATOR_JUMP) {
+            terminator->true_block =
+                remapped_blocks[terminator->true_block];
+        } else if (terminator->kind == IR_TERMINATOR_BRANCH) {
+            terminator->true_block =
+                remapped_blocks[terminator->true_block];
+            terminator->false_block =
+                remapped_blocks[terminator->false_block];
+        }
+    }
+
+    free(reachable);
+    free(worklist);
+    free(remapped_blocks);
+    return 0;
+}
+
+static int
+ir_remove_dead_expression_statements(
+    ir_function *function
+)
+{
+    unsigned char *live_values = calloc(
+        (size_t)function->value_count,
+        sizeof(*live_values)
+    );
+    unsigned char *pure_states = calloc(
+        (size_t)function->value_count,
+        sizeof(*pure_states)
+    );
+    if (
+        function->value_count != 0 &&
+        (!live_values || !pure_states)
+    ) {
+        free(live_values);
+        free(pure_states);
+        return 1;
+    }
+
+    for (unsigned long block_index = 0;
+         block_index < function->block_count;
+         block_index++)
+    {
+        ir_basic_block *block = &function->blocks[block_index];
+        for (unsigned long instruction_index = 0;
+             instruction_index < block->instruction_count;
+             instruction_index++)
+        {
+            ir_instruction *instruction =
+                &block->instructions[instruction_index];
+            if (
+                instruction->opcode == IR_INSTRUCTION_EXPRESSION &&
+                instruction->result_value != ULONG_MAX &&
+                ir_value_is_pure(
+                    function,
+                    instruction->result_value,
+                    pure_states
+                )
+            ) {
+                continue;
+            }
+            ir_mark_instruction_values(
+                function,
+                instruction,
+                live_values
+            );
+        }
+
+        if (block->terminator.kind == IR_TERMINATOR_BRANCH) {
+            ir_mark_value_tree(
+                function,
+                block->terminator.condition_value,
+                live_values
+            );
+        }
+    }
+
+    for (unsigned long block_index = 0;
+         block_index < function->block_count;
+         block_index++)
+    {
+        ir_basic_block *block = &function->blocks[block_index];
+        unsigned long write_index = 0;
+        for (unsigned long read_index = 0;
+             read_index < block->instruction_count;
+             read_index++)
+        {
+            ir_instruction *instruction =
+                &block->instructions[read_index];
+            if (
+                instruction->opcode == IR_INSTRUCTION_EXPRESSION &&
+                instruction->result_value != ULONG_MAX &&
+                !live_values[instruction->result_value] &&
+                ir_value_is_pure(
+                    function,
+                    instruction->result_value,
+                    pure_states
+                )
+            ) {
+                ir_instruction_free(instruction);
+                continue;
+            }
+            if (write_index != read_index) {
+                block->instructions[write_index] = *instruction;
+            }
+            write_index++;
+        }
+        block->instruction_count = write_index;
+    }
+
+    free(live_values);
+    free(pure_states);
+    return 0;
+}
+
+static int
 ir_optimize_function(
     ir_module *module,
     ir_function *function
@@ -3416,7 +3795,8 @@ ir_optimize_function(
         }
     }
 
-    return 0;
+    return ir_remove_unreachable_blocks(function) ||
+        ir_remove_dead_expression_statements(function);
 }
 
 

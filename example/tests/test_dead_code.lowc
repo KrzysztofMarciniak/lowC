@@ -1,0 +1,19 @@
+u1 dead_code_result = 0;
+
+void dead_effect(void) {
+    dead_code_result = 99;
+}
+
+void live_effect(void) {
+    dead_code_result = dead_code_result + 1;
+}
+
+void entrypoint(void) {
+    if (0) {
+        dead_effect();
+    } else {
+        live_effect();
+    }
+    live_effect();
+    return;
+}

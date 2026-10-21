@@ -71,9 +71,12 @@ Normal executable builds optimize the compiler's IR by default. Use
 `-Os`, LTO, dead-section removal, and stripped symbols. The IR optimizer folds
 constant expressions, simplifies constant branches, propagates scalar constants
 through straight-line code, and precomputes simple pure multi-return calls
-with constant arguments. Each function gets its own linker section so unused
-code can be discarded. The system compiler's optimization flags also apply to
-C sources compiled alongside lowC.
+with constant arguments. It also removes blocks made unreachable by branch
+simplification and unused, proven-pure expression statements; calls, stores,
+inline assembly, and potentially trapping or indirect memory operations are
+preserved. Each function gets its own linker section so unused code can be
+discarded. The system compiler's optimization flags also apply to C sources
+compiled alongside lowC.
 `-debug` emits source-mapped debug information, retains symbols, and disables
 optimization unless combined with `-optimize` or `-release`. There are no
 `-O0`/`-O1` levels.
