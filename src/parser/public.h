@@ -15,6 +15,7 @@ typedef enum ast_type
     AST_GLOBAL,
     AST_FUNCTION,
     AST_PARAMETER,
+    AST_RETURN_TYPE,
 
     AST_BLOCK,
 
@@ -26,6 +27,7 @@ typedef enum ast_type
     AST_RETURN,
 
     AST_ASSIGNMENT,
+    AST_MULTI_ASSIGNMENT,
     AST_ASM,
     AST_ASM_OPERAND,
 
@@ -89,6 +91,7 @@ struct ast
     char *file;
     unsigned long line;
     unsigned long column;
+    int imported;
 
     union
     {
@@ -143,8 +146,7 @@ struct ast
         /* AST_FUNCTION */
         struct
         {
-            char *return_type;
-            unsigned long return_pointer_depth;
+            ast_list return_types;
             char *name;
             int is_foreign;
             char *foreign_language;
@@ -159,6 +161,13 @@ struct ast
             char *name;
             unsigned long pointer_depth;
         } parameter;
+
+        /* AST_RETURN_TYPE */
+        struct
+        {
+            char *type;
+            unsigned long pointer_depth;
+        } return_type;
 
         /* AST_BLOCK */
         struct
@@ -186,7 +195,7 @@ struct ast
         /* AST_RETURN */
         struct
         {
-            ast *value;
+            ast_list values;
         } return_statement;
 
         /* AST_ASSIGNMENT */
@@ -195,6 +204,13 @@ struct ast
             ast *left;
             ast *right;
         } assignment;
+
+        /* AST_MULTI_ASSIGNMENT */
+        struct
+        {
+            ast_list targets;
+            ast *value;
+        } multi_assignment;
 
         /* AST_ASM */
         struct

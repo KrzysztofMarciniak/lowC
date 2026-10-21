@@ -201,7 +201,7 @@ semantic_expression_is_integer(
  * Return non-zero when the expression names a storage location
  * that can be assigned to or have its address taken.
  */
-static int
+int
 semantic_expression_is_lvalue(
     ast *expression
 )
@@ -838,8 +838,8 @@ semantic_check_pointer_member(
 }
 
 
-static semantic_type *
-semantic_check_call(
+semantic_function *
+semantic_check_call_signature(
     semantic_context *context,
     ast *expression,
     char **error_text
@@ -847,7 +847,6 @@ semantic_check_call(
 {
     semantic_function *signature;
     unsigned long i;
-    semantic_type *result;
 
 
     if (
@@ -942,7 +941,35 @@ semantic_check_call(
     }
 
 
-    result = semantic_type_copy(signature->return_type);
+    return signature;
+}
+
+static semantic_type *
+semantic_check_call(
+    semantic_context *context,
+    ast *expression,
+    char **error_text
+)
+{
+    semantic_function *signature;
+    semantic_type *result;
+
+    signature = semantic_check_call_signature(
+        context,
+        expression,
+        error_text
+    );
+    if (signature == NULL)
+        return NULL;
+
+    if (signature->return_type_count != 1) {
+        *error_text = semantic_strdup(
+            "multiple return values require tuple destructuring assignment"
+        );
+        return NULL;
+    }
+
+    result = semantic_type_copy(signature->return_types[0]);
 
     if (result == NULL)
     {
@@ -1142,6 +1169,12 @@ semantic_check_expression(
                 expression,
                 error_text
             );
+
+        case AST_MULTI_ASSIGNMENT:
+            *error_text = semantic_strdup(
+                "tuple assignment is only valid as a statement"
+            );
+            return NULL;
 
 
         case AST_CALL:

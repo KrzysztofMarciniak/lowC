@@ -8,6 +8,7 @@ typedef struct source_file
     char *path;
     char *content;
     unsigned long size;
+    int imported;
 } source_file;
 
 typedef struct files_handler_result

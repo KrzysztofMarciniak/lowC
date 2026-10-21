@@ -15,6 +15,11 @@ void codegen_x86_64_expression(
     ast *expression
 );
 
+void codegen_x86_64_ir_expression_id(
+    codegen_x86_64_context *context,
+    unsigned long value_id
+);
+
 
 /*
  * Generate the address of an lvalue.

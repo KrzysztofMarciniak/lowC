@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,6 +27,7 @@ parser_new_node(
 
         node->line = token->line;
         node->column = token->column;
+        node->imported = token->imported;
 
         if (token->file != NULL &&
             node->file == NULL)
@@ -628,7 +630,11 @@ parser_parse_top_level(
     if (current->type == TOKEN_INCLUDE)
         return parser_parse_import(state);
 
-    if (current->type == TOKEN_STRUCT)
+    if (
+        current->type == TOKEN_STRUCT &&
+        parser_peek(state, 2) != NULL &&
+        parser_peek(state, 2)->type == TOKEN_LBRACE
+    )
         return parser_parse_struct(state);
 
     return parser_parse_function_or_global(state);
@@ -1027,6 +1033,8 @@ parser_parse_function_or_global(
     char *foreign_language;
     unsigned long pointer_depth;
     int is_foreign;
+    ast_list return_types = {0};
+    int multiple_return_types = 0;
 
     foreign_language = NULL;
     is_foreign = parser_match(state, TOKEN_FOREIGN);
@@ -1060,6 +1068,65 @@ parser_parse_function_or_global(
         return NULL;
     }
 
+    {
+        ast *return_type;
+
+        return_type = parser_new_node(AST_RETURN_TYPE, NULL);
+        if (return_type == NULL) {
+            free(type);
+            free(foreign_language);
+            return NULL;
+        }
+
+        return_type->return_type.type = parser_copy_string(type);
+        return_type->return_type.pointer_depth = pointer_depth;
+
+        if (
+            return_type->return_type.type == NULL ||
+            !parser_append_ast(&return_types, return_type)
+        ) {
+            parser_free(return_type);
+            parser_free_list(&return_types);
+            free(type);
+            free(foreign_language);
+            return NULL;
+        }
+    }
+
+    while (parser_match(state, TOKEN_COMMA)) {
+        char *next_type;
+        unsigned long next_pointer_depth;
+        ast *return_type;
+
+        next_type = parser_parse_type(state, &next_pointer_depth);
+        if (next_type == NULL) {
+            parser_free_list(&return_types);
+            free(type);
+            free(foreign_language);
+            return NULL;
+        }
+
+        return_type = parser_new_node(AST_RETURN_TYPE, NULL);
+        if (return_type == NULL) {
+            free(next_type);
+            parser_free_list(&return_types);
+            free(type);
+            free(foreign_language);
+            return NULL;
+        }
+
+        return_type->return_type.type = next_type;
+        return_type->return_type.pointer_depth = next_pointer_depth;
+        if (!parser_append_ast(&return_types, return_type)) {
+            parser_free(return_type);
+            parser_free_list(&return_types);
+            free(type);
+            free(foreign_language);
+            return NULL;
+        }
+        multiple_return_types = 1;
+    }
+
     name =
         parser_current(state);
 
@@ -1071,6 +1138,7 @@ parser_parse_function_or_global(
         );
 
         free(type);
+        parser_free_list(&return_types);
         free(foreign_language);
         return NULL;
     }
@@ -1083,6 +1151,7 @@ parser_parse_function_or_global(
         );
 
         free(type);
+        parser_free_list(&return_types);
         free(foreign_language);
         return NULL;
     }
@@ -1105,15 +1174,13 @@ parser_parse_function_or_global(
         if (node == NULL)
         {
             free(type);
+            parser_free_list(&return_types);
             free(foreign_language);
             return NULL;
         }
 
-        node->function.return_type =
-            type;
-
-        node->function.return_pointer_depth =
-            pointer_depth;
+        free(type);
+        node->function.return_types = return_types;
         node->function.is_foreign = is_foreign;
         node->function.foreign_language = foreign_language;
 
@@ -1263,6 +1330,14 @@ parser_parse_function_or_global(
         }
 
         if (is_foreign) {
+            if (multiple_return_types) {
+                parser_set_error(
+                    state,
+                    "foreign functions must declare exactly one return type."
+                );
+                parser_free(node);
+                return NULL;
+            }
             if (!parser_expect(state, TOKEN_SEMICOLON)) {
                 parser_free(node);
                 return NULL;
@@ -1286,9 +1361,23 @@ parser_parse_function_or_global(
             "foreign declarations must declare a function."
         );
         free(type);
+        parser_free_list(&return_types);
         free(foreign_language);
         return NULL;
     }
+
+    if (multiple_return_types) {
+        parser_set_error(
+            state,
+            "multiple return types are only valid on functions."
+        );
+        free(type);
+        parser_free_list(&return_types);
+        free(foreign_language);
+        return NULL;
+    }
+
+    parser_free_list(&return_types);
 
     {
         ast *node;
@@ -1515,8 +1604,43 @@ parser_parse_statement(
         assembly->assembly.template =
             parser_copy_string(parser_advance(state)->value);
         if (assembly->assembly.template == NULL) {
+            parser_set_error(state, "out of memory.");
             parser_free(assembly);
             return NULL;
+        }
+
+        while (
+            parser_current(state) != NULL &&
+            parser_current(state)->type == TOKEN_STRING
+        ) {
+            const char *part = parser_advance(state)->value;
+            size_t template_length =
+                strlen(assembly->assembly.template);
+            size_t part_length = strlen(part);
+            char *combined;
+
+            if (part_length > SIZE_MAX - template_length - 1) {
+                parser_set_error(state, "assembly template is too large.");
+                parser_free(assembly);
+                return NULL;
+            }
+
+            combined = realloc(
+                assembly->assembly.template,
+                template_length + part_length + 1
+            );
+            if (combined == NULL) {
+                parser_set_error(state, "out of memory.");
+                parser_free(assembly);
+                return NULL;
+            }
+
+            memcpy(
+                combined + template_length,
+                part,
+                part_length + 1
+            );
+            assembly->assembly.template = combined;
         }
 
         if (!parser_expect(state, TOKEN_COLON)) {
@@ -2047,13 +2171,32 @@ parser_parse_return(
             TOKEN_SEMICOLON
         ))
     {
-        node->return_statement.value =
-            parser_parse_expression(state);
+        while (1) {
+            ast *value = parser_parse_expression(state);
 
-        if (node->return_statement.value == NULL)
-        {
-            parser_free(node);
-            return NULL;
+            if (
+                value == NULL ||
+                !parser_append_ast(&node->return_statement.values, value)
+            ) {
+                parser_free(value);
+                parser_free(node);
+                return NULL;
+            }
+
+            if (!parser_match(state, TOKEN_COMMA))
+                break;
+
+            if (
+                parser_current(state) == NULL ||
+                parser_current(state)->type == TOKEN_SEMICOLON
+            ) {
+                parser_set_error(
+                    state,
+                    "expected a return value after ','."
+                );
+                parser_free(node);
+                return NULL;
+            }
         }
 
         if (!parser_expect(
@@ -2095,8 +2238,12 @@ parser_parse_expression_statement(
         return NULL;
     }
 
-    node->expression_statement.expression =
-        expression;
+    if (expression->type == AST_MULTI_ASSIGNMENT) {
+        parser_free(node);
+        node = expression;
+    } else {
+        node->expression_statement.expression = expression;
+    }
 
     if (!parser_expect(
             state,
@@ -2118,6 +2265,54 @@ parser_parse_expression(
     return parser_parse_assignment(state);
 }
 
+static int
+parser_is_multi_assignment(
+    parser_state *state
+)
+{
+    unsigned long offset;
+    unsigned long depth;
+    int has_separator;
+
+    if (
+        parser_current(state) == NULL ||
+        parser_current(state)->type != TOKEN_LPAREN
+    ) {
+        return 0;
+    }
+
+    depth = 0;
+    has_separator = 0;
+
+    for (offset = 0; offset < state->count - state->position; offset++) {
+        token *current = parser_peek(state, offset);
+
+        if (current == NULL)
+            return 0;
+
+        if (current->type == TOKEN_LPAREN) {
+            depth++;
+        } else if (current->type == TOKEN_RPAREN) {
+            if (depth == 0)
+                return 0;
+            depth--;
+            if (depth == 0) {
+                token *after = parser_peek(state, offset + 1);
+                return has_separator &&
+                    after != NULL &&
+                    after->type == TOKEN_ASSIGN;
+            }
+        } else if (
+            current->type == TOKEN_COMMA &&
+            depth == 1
+        ) {
+            has_separator = 1;
+        }
+    }
+
+    return 0;
+}
+
 ast *
 parser_parse_assignment(
     parser_state *state
@@ -2126,6 +2321,45 @@ parser_parse_assignment(
     ast *left;
     ast *right;
     ast *node;
+
+    if (parser_is_multi_assignment(state)) {
+        node = parser_new_node(AST_MULTI_ASSIGNMENT, parser_current(state));
+        if (node == NULL)
+            return NULL;
+
+        parser_advance(state);
+        while (1) {
+            ast *target = parser_parse_logical_or(state);
+
+            if (
+                target == NULL ||
+                !parser_append_ast(&node->multi_assignment.targets, target)
+            ) {
+                parser_free(target);
+                parser_free(node);
+                return NULL;
+            }
+
+            if (!parser_match(state, TOKEN_COMMA))
+                break;
+        }
+
+        if (
+            !parser_expect(state, TOKEN_RPAREN) ||
+            !parser_expect(state, TOKEN_ASSIGN)
+        ) {
+            parser_free(node);
+            return NULL;
+        }
+
+        node->multi_assignment.value = parser_parse_assignment(state);
+        if (node->multi_assignment.value == NULL) {
+            parser_free(node);
+            return NULL;
+        }
+
+        return node;
+    }
 
     left =
         parser_parse_logical_or(state);
@@ -3174,9 +3408,12 @@ parser_free(
             break;
 
         case AST_FUNCTION:
-            free(node->function.return_type);
             free(node->function.name);
             free(node->function.foreign_language);
+
+            parser_free_list(
+                &node->function.return_types
+            );
 
             parser_free_list(
                 &node->function.parameters
@@ -3191,6 +3428,10 @@ parser_free(
         case AST_PARAMETER:
             free(node->parameter.type);
             free(node->parameter.name);
+            break;
+
+        case AST_RETURN_TYPE:
+            free(node->return_type.type);
             break;
 
         case AST_BLOCK:
@@ -3235,9 +3476,7 @@ parser_free(
             break;
 
         case AST_RETURN:
-            parser_free(
-                node->return_statement.value
-            );
+            parser_free_list(&node->return_statement.values);
 
             break;
 
@@ -3250,6 +3489,11 @@ parser_free(
                 node->assignment.right
             );
 
+            break;
+
+        case AST_MULTI_ASSIGNMENT:
+            parser_free_list(&node->multi_assignment.targets);
+            parser_free(node->multi_assignment.value);
             break;
 
         case AST_ASM:

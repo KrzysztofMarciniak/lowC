@@ -3,6 +3,7 @@
 
 #include "../../output.h"
 #include "../../../parser/public.h"
+#include "../../../ir/public.h"
 
 
 /*
@@ -119,12 +120,17 @@ typedef struct codegen_x86_64_context
     ast_list *structs;
     ast_list *globals;
     ast_list *functions;
+    ast *current_function;
+    const ir_function *ir_function;
 
 
     /*
      * Total stack space required by this function.
      */
     unsigned long stack_size;
+
+    long return_buffer_offset;
+    int has_return_buffer;
 
 
     /*
@@ -142,6 +148,8 @@ typedef struct codegen_x86_64_context
     int has_epilogue_label;
 
     int optimize;
+    int debug;
+    unsigned long debug_file_id;
 
 } codegen_x86_64_context;
 
@@ -164,6 +172,12 @@ codegen_x86_64_context_init(
 void
 codegen_x86_64_context_free(
     codegen_x86_64_context *context
+);
+
+void
+codegen_x86_64_emit_location(
+    codegen_x86_64_context *context,
+    const ast *node
 );
 
 

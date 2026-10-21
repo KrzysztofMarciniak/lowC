@@ -35,18 +35,36 @@ semantic_function_create(
 
     result->declaration = function;
 
-    result->return_type = semantic_type_resolve(
-        function->function.return_type,
-        function->function.return_pointer_depth,
-        structs,
-        struct_count
-    );
-
-    if (result->return_type == NULL)
+    result->return_type_count = function->function.return_types.count;
+    if (result->return_type_count == 0)
     {
-        free(result->name);
-        free(result);
+        semantic_function_free(result);
         return NULL;
+    }
+
+    result->return_types = calloc(
+        result->return_type_count,
+        sizeof(semantic_type *)
+    );
+    if (result->return_types == NULL) {
+        semantic_function_free(result);
+        return NULL;
+    }
+
+    for (i = 0; i < result->return_type_count; i++) {
+        ast *return_type = function->function.return_types.values[i];
+
+        result->return_types[i] = semantic_type_resolve(
+            return_type->return_type.type,
+            return_type->return_type.pointer_depth,
+            structs,
+            struct_count
+        );
+
+        if (result->return_types[i] == NULL) {
+            semantic_function_free(result);
+            return NULL;
+        }
     }
 
     result->parameter_count =
@@ -120,7 +138,12 @@ semantic_function_free(
 
     free(function->name);
 
-    semantic_type_free(function->return_type);
+    if (function->return_types != NULL) {
+        for (i = 0; i < function->return_type_count; i++)
+            semantic_type_free(function->return_types[i]);
+    }
+
+    free(function->return_types);
 
     if (function->parameter_types != NULL)
     {

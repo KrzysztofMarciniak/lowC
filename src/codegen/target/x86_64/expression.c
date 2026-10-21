@@ -3,11 +3,40 @@
 
 #include "../../output.h"
 
-#include <errno.h>
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+static const ir_value *
+ir_value_for_source(
+    const codegen_x86_64_context *context,
+    const ast *source
+);
+
+static void
+codegen_x86_64_ir_expression(
+    codegen_x86_64_context *context,
+    const ir_value *value
+);
+
+void
+codegen_x86_64_ir_expression_id(
+    codegen_x86_64_context *context,
+    unsigned long value_id
+)
+{
+    if (
+        context &&
+        context->ir_function &&
+        value_id < context->ir_function->value_count
+    ) {
+        codegen_x86_64_ir_expression(
+            context,
+            &context->ir_function->values[value_id]
+        );
+    }
+}
 
 
 /*
@@ -40,6 +69,25 @@ expression_pointee_size(
 )
 {
     codegen_x86_64_local *local;
+    const ir_value *value = ir_value_for_source(context, expression);
+
+    if (value) {
+        if (value->type.is_array) {
+            return codegen_x86_64_context_type_size(
+                context,
+                value->type.name,
+                value->type.pointer_depth
+            );
+        }
+        if (value->type.pointer_depth != 0) {
+            return codegen_x86_64_context_type_size(
+                context,
+                value->type.name,
+                value->type.pointer_depth - 1
+            );
+        }
+        return 0;
+    }
 
 
     if (
@@ -162,6 +210,16 @@ codegen_x86_64_expression_type(
 
     if (!context || !expression || !type || !pointer_depth) {
         return 0;
+    }
+
+    const ir_value *value = ir_value_for_source(context, expression);
+    if (value) {
+        if (value->type.name == NULL) {
+            return 0;
+        }
+        *type = value->type.name;
+        *pointer_depth = value->type.pointer_depth;
+        return 1;
     }
 
     switch (expression->type) {
@@ -319,9 +377,13 @@ codegen_x86_64_expression_type(
                         function->function.name,
                         expression->call.function->identifier.name
                     ) == 0) {
-                    *type = function->function.return_type;
+                    if (function->function.return_types.count != 1)
+                        return 0;
+                    *type = function->function.return_types.values[0]
+                        ->return_type.type;
                     *pointer_depth =
-                        function->function.return_pointer_depth;
+                        function->function.return_types.values[0]
+                            ->return_type.pointer_depth;
                     return 1;
                 }
             }
@@ -423,27 +485,27 @@ emit_load_from_rax(
 static void
 emit_integer(
     codegen_x86_64_context *context,
-    ast *expression
+    const ir_value *value
 )
 {
     codegen_output_printf(
         context->output,
         "    mov rax, %s\n",
-        expression->integer.value
+        value->literal
     );
 }
 
 static void
 emit_string(
     codegen_x86_64_context *context,
-    ast *expression
+    const ir_value *value
 )
 {
     const unsigned char *text;
     unsigned long label;
     unsigned long index;
 
-    text = (const unsigned char *)expression->string.value;
+    text = (const unsigned char *)value->literal;
     label = context->label_count++;
 
     codegen_output_write(context->output, ".section .rodata\n");
@@ -484,8 +546,19 @@ emit_string(
     codegen_output_write(
         context->output,
         "    .byte 0\n"
-        ".text\n"
     );
+    if (
+        context->ir_function &&
+        context->ir_function->declaration
+    ) {
+        codegen_output_printf(
+            context->output,
+            ".section .text.%s,\"ax\",@progbits\n",
+            context->ir_function->declaration->function.name
+        );
+    } else {
+        codegen_output_write(context->output, ".text\n");
+    }
     codegen_output_printf(
         context->output,
         "    lea rax, [rip + .Lstring%lu]\n",
@@ -507,7 +580,7 @@ emit_string(
 static void
 emit_variable(
     codegen_x86_64_context *context,
-    ast *expression
+    const ir_value *value
 )
 {
     codegen_x86_64_local *local;
@@ -517,14 +590,14 @@ emit_variable(
     local =
         codegen_x86_64_find_local(
             context,
-            expression->identifier.name
+            value->name
         );
 
 
     if (!local){
         global = codegen_x86_64_find_global(
             context,
-            expression->identifier.name
+            value->name
         );
         if (!global) {
             return;
@@ -536,11 +609,11 @@ emit_variable(
             global->variable.name
         );
 
-        if (global->variable.array_length == NULL) {
+        if (!value->type.is_array) {
             emit_load_from_rax(
                 context,
-                global->variable.type,
-                global->variable.pointer_depth
+                value->type.name,
+                value->type.pointer_depth
             );
         }
         return;
@@ -642,7 +715,7 @@ emit_variable(
 static void
 emit_binary(
     codegen_x86_64_context *context,
-    ast *expression
+    const ir_value *value
 )
 {
     unsigned long left_pointee_size;
@@ -654,10 +727,7 @@ emit_binary(
      * Evaluate left operand
      * ------------------------------------------------------------
      */
-    codegen_x86_64_expression(
-        context,
-        expression->binary.left
-    );
+    codegen_x86_64_ir_expression_id(context, value->left);
 
 
     codegen_output_write(
@@ -673,10 +743,7 @@ emit_binary(
      * Evaluate right operand
      * ------------------------------------------------------------
      */
-    codegen_x86_64_expression(
-        context,
-        expression->binary.right
-    );
+    codegen_x86_64_ir_expression_id(context, value->right);
 
 
     /*
@@ -696,18 +763,18 @@ emit_binary(
     left_pointee_size =
         expression_pointee_size(
             context,
-            expression->binary.left
+            (ast *)context->ir_function->values[value->left].source
         );
 
 
     right_pointee_size =
         expression_pointee_size(
             context,
-            expression->binary.right
+            (ast *)context->ir_function->values[value->right].source
         );
 
 
-    switch (expression->binary.operator){
+    switch (value->binary_operator){
 
         case AST_BINARY_ADD:
 
@@ -911,7 +978,7 @@ emit_binary(
 static void
 emit_logical_and(
     codegen_x86_64_context *context,
-    ast *expression
+    const ir_value *value
 )
 {
     unsigned long false_label;
@@ -931,10 +998,7 @@ emit_logical_and(
      * Evaluate left side
      * ------------------------------------------------------------
      */
-    codegen_x86_64_expression(
-        context,
-        expression->binary.left
-    );
+    codegen_x86_64_ir_expression_id(context, value->left);
 
 
     codegen_output_write(
@@ -955,10 +1019,7 @@ emit_logical_and(
      * Evaluate right side
      * ------------------------------------------------------------
      */
-    codegen_x86_64_expression(
-        context,
-        expression->binary.right
-    );
+    codegen_x86_64_ir_expression_id(context, value->right);
 
 
     codegen_output_write(
@@ -995,7 +1056,7 @@ emit_logical_and(
 static void
 emit_logical_or(
     codegen_x86_64_context *context,
-    ast *expression
+    const ir_value *value
 )
 {
     unsigned long true_label;
@@ -1015,10 +1076,7 @@ emit_logical_or(
      * Evaluate left side
      * ------------------------------------------------------------
      */
-    codegen_x86_64_expression(
-        context,
-        expression->binary.left
-    );
+    codegen_x86_64_ir_expression_id(context, value->left);
 
 
     codegen_output_write(
@@ -1039,10 +1097,7 @@ emit_logical_or(
      * Evaluate right side
      * ------------------------------------------------------------
      */
-    codegen_x86_64_expression(
-        context,
-        expression->binary.right
-    );
+    codegen_x86_64_ir_expression_id(context, value->right);
 
 
     codegen_output_write(
@@ -1075,27 +1130,21 @@ emit_logical_or(
 static void
 emit_unary(
     codegen_x86_64_context *context,
-    ast *expression
+    const ir_value *value
 )
 {
-    switch (expression->unary.operator){
+    switch (value->unary_operator){
 
         case AST_UNARY_PLUS:
 
-            codegen_x86_64_expression(
-                context,
-                expression->unary.operand
-            );
+            codegen_x86_64_ir_expression_id(context, value->left);
 
             return;
 
 
         case AST_UNARY_MINUS:
 
-            codegen_x86_64_expression(
-                context,
-                expression->unary.operand
-            );
+            codegen_x86_64_ir_expression_id(context, value->left);
 
             codegen_output_write(
                 context->output,
@@ -1107,10 +1156,7 @@ emit_unary(
 
         case AST_UNARY_NOT:
 
-            codegen_x86_64_expression(
-                context,
-                expression->unary.operand
-            );
+            codegen_x86_64_ir_expression_id(context, value->left);
 
             codegen_output_write(
                 context->output,
@@ -1126,7 +1172,7 @@ emit_unary(
 
             codegen_x86_64_lvalue_address(
                 context,
-                expression->unary.operand
+                (ast *)context->ir_function->values[value->left].source
             );
 
             return;
@@ -1140,17 +1186,11 @@ emit_unary(
             /*
              * The operand evaluates to an address.
              */
-            codegen_x86_64_expression(
-                context,
-                expression->unary.operand
-            );
+            codegen_x86_64_ir_expression_id(context, value->left);
 
-            if (codegen_x86_64_expression_type(
-                    context,
-                    expression,
-                    &type,
-                    &pointer_depth
-                )) {
+            if (value->type.name != NULL) {
+                type = value->type.name;
+                pointer_depth = value->type.pointer_depth;
                 emit_load_from_rax(context, type, pointer_depth);
             }
 
@@ -1170,28 +1210,23 @@ emit_unary(
 static void
 emit_index(
     codegen_x86_64_context *context,
-    ast *expression
+    const ir_value *value
 )
 {
-    const char *type;
-    unsigned long pointer_depth;
-
     /*
      * First calculate the address of the element.
      */
     codegen_x86_64_lvalue_address(
         context,
-        expression
+        (ast *)value->source
     );
 
-
-    if (codegen_x86_64_expression_type(
+    if (value->type.name != NULL) {
+        emit_load_from_rax(
             context,
-            expression,
-            &type,
-            &pointer_depth
-        )) {
-        emit_load_from_rax(context, type, pointer_depth);
+            value->type.name,
+            value->type.pointer_depth
+        );
     }
 }
 
@@ -1205,27 +1240,39 @@ emit_index(
 static void
 emit_call(
     codegen_x86_64_context *context,
-    ast *expression
+    const ir_value *value
 )
 {
     unsigned long count;
     unsigned long index;
     int needs_alignment;
 
-    ast *function;
+    ast *signature;
 
-
-    if (!expression){
+    if (!value || !value->name) {
         return;
     }
 
+    count = value->argument_count;
+    signature = NULL;
 
-    count =
-        expression->call.arguments.count;
+    if (context->functions) {
+        for (
+            index = 0;
+            index < context->functions->count;
+            index++
+        ) {
+            ast *candidate = context->functions->values[index];
 
-
-    function =
-        expression->call.function;
+            if (strcmp(
+                    candidate->function.name,
+                    value->name
+                ) == 0) {
+                signature = candidate;
+                break;
+            }
+        }
+    }
 
 
     if (count > 6){
@@ -1249,13 +1296,10 @@ emit_call(
         index > 0;
         index--
     ){
-        codegen_x86_64_expression(
+        codegen_x86_64_ir_expression_id(
             context,
-            expression->call.arguments.values[
-                index - 1
-            ]
+            value->arguments[index - 1]
         );
-
 
         codegen_output_write(
             context->output,
@@ -1290,10 +1334,7 @@ emit_call(
 
     needs_alignment = context->stack_depth % 16 != 0;
 
-    if (
-        function &&
-        function->type == AST_IDENTIFIER
-    ){
+    if (signature) {
         if (needs_alignment) {
             codegen_output_write(
                 context->output,
@@ -1301,10 +1342,21 @@ emit_call(
             );
         }
 
+        if (
+            signature != NULL &&
+            signature->function.return_types.count > 1
+        ) {
+            codegen_output_printf(
+                context->output,
+                "    lea r10, [rsp%+d]\n",
+                needs_alignment ? 8 : 0
+            );
+        }
+
         codegen_output_printf(
             context->output,
             "    call %s\n",
-            function->identifier.name
+            value->name
         );
 
         if (needs_alignment) {
@@ -1318,15 +1370,9 @@ emit_call(
             const char *return_type;
             unsigned long return_pointer_depth;
 
-            if (
-                codegen_x86_64_expression_type(
-                    context,
-                    expression,
-                    &return_type,
-                    &return_pointer_depth
-                ) &&
-                return_pointer_depth == 0
-            ) {
+            return_type = value->type.name;
+            return_pointer_depth = value->type.pointer_depth;
+            if (return_type && return_pointer_depth == 0) {
                 unsigned long return_size =
                     codegen_x86_64_type_size(return_type, 0);
                 int is_signed =
@@ -1364,136 +1410,6 @@ emit_call(
         }
     }
 }
-
-static int
-expression_constant_value(
-    ast *expression,
-    uint64_t *value
-)
-{
-    uint64_t left;
-    uint64_t right;
-    char *end;
-    long long integer;
-
-    if (!expression || !value) {
-        return 0;
-    }
-
-    switch (expression->type) {
-        case AST_INTEGER:
-            errno = 0;
-            integer = strtoll(expression->integer.value, &end, 10);
-            if (errno != 0 || *end != '\0') {
-                return 0;
-            }
-            *value = (uint64_t)integer;
-            return 1;
-
-        case AST_UNARY:
-            if (!expression_constant_value(
-                    expression->unary.operand,
-                    &left
-                )) {
-                return 0;
-            }
-
-            switch (expression->unary.operator) {
-                case AST_UNARY_PLUS:
-                    *value = left;
-                    return 1;
-                case AST_UNARY_MINUS:
-                    *value = UINT64_C(0) - left;
-                    return 1;
-                case AST_UNARY_NOT:
-                    *value = left == 0;
-                    return 1;
-                default:
-                    return 0;
-            }
-
-        case AST_BINARY:
-            if (!expression_constant_value(
-                    expression->binary.left,
-                    &left
-                )) {
-                return 0;
-            }
-
-            if (expression->binary.operator == AST_BINARY_AND && left == 0) {
-                *value = 0;
-                return 1;
-            }
-            if (expression->binary.operator == AST_BINARY_OR && left != 0) {
-                *value = 1;
-                return 1;
-            }
-
-            if (!expression_constant_value(
-                    expression->binary.right,
-                    &right
-                )) {
-                return 0;
-            }
-
-            switch (expression->binary.operator) {
-                case AST_BINARY_ADD:
-                    *value = left + right;
-                    return 1;
-                case AST_BINARY_SUBTRACT:
-                    *value = left - right;
-                    return 1;
-                case AST_BINARY_MULTIPLY:
-                    *value = left * right;
-                    return 1;
-                case AST_BINARY_DIVIDE:
-                    if (right == 0 ||
-                        ((int64_t)left == INT64_MIN &&
-                         (int64_t)right == -1)) {
-                        return 0;
-                    }
-                    *value = (uint64_t)((int64_t)left / (int64_t)right);
-                    return 1;
-                case AST_BINARY_MODULO:
-                    if (right == 0 ||
-                        ((int64_t)left == INT64_MIN &&
-                         (int64_t)right == -1)) {
-                        return 0;
-                    }
-                    *value = (uint64_t)((int64_t)left % (int64_t)right);
-                    return 1;
-                case AST_BINARY_EQUAL:
-                    *value = left == right;
-                    return 1;
-                case AST_BINARY_NOT_EQUAL:
-                    *value = left != right;
-                    return 1;
-                case AST_BINARY_LESS:
-                    *value = (int64_t)left < (int64_t)right;
-                    return 1;
-                case AST_BINARY_LESS_EQUAL:
-                    *value = (int64_t)left <= (int64_t)right;
-                    return 1;
-                case AST_BINARY_GREATER:
-                    *value = (int64_t)left > (int64_t)right;
-                    return 1;
-                case AST_BINARY_GREATER_EQUAL:
-                    *value = (int64_t)left >= (int64_t)right;
-                    return 1;
-                case AST_BINARY_AND:
-                    *value = right != 0;
-                    return 1;
-                case AST_BINARY_OR:
-                    *value = right != 0;
-                    return 1;
-            }
-            return 0;
-
-        default:
-            return 0;
-    }
-}
-
 
 /*
  * Generate the address of an lvalue.
@@ -1750,84 +1666,92 @@ codegen_x86_64_lvalue_address(
  *
  * The resulting value is placed in rax.
  */
-void
-codegen_x86_64_expression(
-    codegen_x86_64_context *context,
-    ast *expression
+static const ir_value *
+ir_value_for_source(
+    const codegen_x86_64_context *context,
+    const ast *source
 )
 {
-    uint64_t constant;
+    if (!context->ir_function) {
+        return NULL;
+    }
 
-    if (
-        !context ||
-        !expression
-    ){
+    for (unsigned long index = 0;
+         index < context->ir_function->value_count;
+         index++)
+    {
+        const ir_value *value = &context->ir_function->values[index];
+        if (value->source == source) {
+            return value;
+        }
+    }
+
+    return NULL;
+}
+
+static void
+codegen_x86_64_ir_expression(
+    codegen_x86_64_context *context,
+    const ir_value *value
+)
+{
+    ast *expression;
+
+    if (!context || !value || !value->source) {
         return;
     }
 
+    expression = (ast *)value->source;
+
     if (
         context->optimize &&
-        expression->type != AST_INTEGER &&
-        expression_constant_value(expression, &constant)
+        value->is_constant &&
+        value->opcode != IR_VALUE_INTEGER
     ) {
         codegen_output_printf(
             context->output,
             "    mov rax, %" PRIu64 "\n",
-            constant
+            value->constant_value
         );
         return;
     }
 
-    switch (expression->type){
+    codegen_x86_64_emit_location(context, expression);
 
-        case AST_INTEGER:
+    switch (value->opcode){
 
-            emit_integer(
-                context,
-                expression
-            );
+        case IR_VALUE_INTEGER:
+            emit_integer(context, value);
 
             return;
 
-        case AST_STRING:
-
-            emit_string(
-                context,
-                expression
-            );
+        case IR_VALUE_STRING:
+            emit_string(context, value);
 
             return;
 
 
-        case AST_IDENTIFIER:
-
-            emit_variable(
-                context,
-                expression
-            );
+        case IR_VALUE_LOAD:
+            emit_variable(context, value);
 
             return;
 
 
-        case AST_UNARY:
-
-            emit_unary(
-                context,
-                expression
-            );
+        case IR_VALUE_UNARY:
+            emit_unary(context, value);
 
             return;
 
 
-        case AST_BINARY:
+        case IR_VALUE_BINARY:
 
-            switch (expression->binary.operator){
+            switch (value->binary_operator){
 
                 case AST_BINARY_AND:
 
                     emit_logical_and(
                         context,
-                        expression
+                        value
                     );
 
                     return;
@@ -1837,7 +1761,7 @@ codegen_x86_64_expression(
 
                     emit_logical_or(
                         context,
-                        expression
+                        value
                     );
 
                     return;
@@ -1847,35 +1771,27 @@ codegen_x86_64_expression(
 
                     emit_binary(
                         context,
-                        expression
+                        value
                     );
 
                     return;
             }
 
 
-        case AST_CALL:
-
-            emit_call(
-                context,
-                expression
-            );
+        case IR_VALUE_CALL:
+            emit_call(context, value);
 
             return;
 
 
-        case AST_INDEX:
-
-            emit_index(
-                context,
-                expression
-            );
+        case IR_VALUE_INDEX:
+            emit_index(context, value);
 
             return;
 
 
-        case AST_MEMBER:
-        case AST_POINTER_MEMBER:
+        case IR_VALUE_MEMBER:
+        case IR_VALUE_POINTER_MEMBER:
         {
             const char *type;
             unsigned long pointer_depth;
@@ -1885,12 +1801,9 @@ codegen_x86_64_expression(
                 expression
             );
 
-            if (codegen_x86_64_expression_type(
-                    context,
-                    expression,
-                    &type,
-                    &pointer_depth
-                )) {
+            type = value->type.name;
+            pointer_depth = value->type.pointer_depth;
+            if (type != NULL) {
                 emit_load_from_rax(context, type, pointer_depth);
             }
 
@@ -1905,5 +1818,17 @@ codegen_x86_64_expression(
              * before reaching target code generation.
              */
             return;
+    }
+}
+
+void
+codegen_x86_64_expression(
+    codegen_x86_64_context *context,
+    ast *expression
+)
+{
+    const ir_value *value = ir_value_for_source(context, expression);
+    if (value) {
+        codegen_x86_64_ir_expression(context, value);
     }
 }

@@ -24,6 +24,7 @@ typedef struct flag_handler_options
     int format;
     int tokens;
     int version;
+    int debug;
     int optimize;
     int executable;
     const char *output_path;

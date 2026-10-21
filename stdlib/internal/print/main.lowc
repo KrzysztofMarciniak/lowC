@@ -1,68 +1,61 @@
-void __lowc_write_stdout(u1 *data, u8 length) {
-    for (; length != 0; ) {
-        s8 written = 0;
+void __lowc_write_stdout(u1* data, u8 length) {
+        for (; length != 0;) {
+                s8 written = 0;
 
-        asm("syscall"
-            : "=rax"(written)
-            : "rax"(1), "rdi"(1), "rsi"(data), "rdx"(length)
-            : "rcx", "r11", "memory", "cc");
+                asm("syscall"
+                    : "=rax"(written)
+                    : "rax"(1), "rdi"(1), "rsi"(data), "rdx"(length)
+                    : "rcx", "r11", "memory", "cc");
 
-        if (written <= 0) {
-            return;
+                if (written <= 0) {
+                        return;
+                }
+
+                data   = data + written;
+                length = length - written;
         }
 
-        data = data + written;
-        length = length - written;
-    }
-
-    return;
+        return;
 }
 
 void __lowc_print_u8(u8 value) {
-    u1 digits[20] = 0;
-    u8 index = 0;
-    u8 quotient = 0;
-    u8 remainder = 0;
+        u1 digits[20] = 0;
+        u8 index      = 0;
+        u8 quotient   = 0;
+        u8 remainder  = 0;
 
-    index = 20;
+        index = 20;
 
-    if (value == 0) {
-        index = 19;
-        digits[index] = 48;
-    }
+        if (value == 0) {
+                index         = 19;
+                digits[index] = 48;
+        }
 
-    for (; value != 0; ) {
-        asm(
-            "xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
-            : "=rax"(quotient)
-            : "rax"(value), "rsi"(10), "rdi"(&remainder)
-            : "rdx", "memory", "cc"
-        );
+        for (; value != 0;) {
+                asm("xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
+                    : "=rax"(quotient)
+                    : "rax"(value), "rsi"(10), "rdi"(&remainder)
+                    : "rdx", "memory", "cc");
 
-        index = index - 1;
-        digits[index] = 48 + remainder;
-        value = quotient;
-    }
+                index         = index - 1;
+                digits[index] = 48 + remainder;
+                value         = quotient;
+        }
 
-    __lowc_write_stdout(&digits[index], 20 - index);
-    return;
+        __lowc_write_stdout(&digits[index], 20 - index);
+        return;
 }
 
 void __lowc_print_s8(s8 value) {
-    u8 magnitude = 0;
+        u8 magnitude = 0;
 
-    if (value < 0) {
-        __lowc_write_stdout("-", 1);
-        asm(
-            "neg rax"
-            : "=rax"(magnitude)
-            : "rax"(value)
-            : "cc"
-        );
-    } else {
-        magnitude = value;
-    }
+        if (value < 0) {
+                __lowc_write_stdout("-", 1);
+                asm("neg rax" : "=rax"(magnitude) : "rax"(value) : "cc");
+        } else {
+                magnitude = value;
+        }
 
-    __lowc_print_u8(magnitude);
-    return;
+        __lowc_print_u8(magnitude);
+        return;
 }

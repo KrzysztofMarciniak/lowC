@@ -29,7 +29,8 @@ flag_handler(
         .format = 0,
         .tokens = 0,
         .version = 0,
-        .optimize = 0,
+        .debug = 0,
+        .optimize = 1,
         .executable = 1,
         .output_path = NULL,
         .linker_arguments = NULL,
@@ -57,6 +58,8 @@ flag_handler(
             return flag_handler_error("out of memory.");
         }
     }
+
+    int optimize_explicit = 0;
 
     for (int index = 0; index < flags->count; index++)
     {
@@ -91,6 +94,12 @@ flag_handler(
 
         if (flag_handler_is_optimize(flag)) {
             options.optimize = 1;
+            optimize_explicit = 1;
+            continue;
+        }
+
+        if (flag_handler_is_debug(flag)) {
+            options.debug = 1;
             continue;
         }
 
@@ -231,7 +240,8 @@ flag_handler(
             options.ast ||
             options.asm_output ||
             options.tokens ||
-            options.optimize ||
+            optimize_explicit ||
+            options.debug ||
             options.output_path != NULL ||
             options.linker_argument_count != 0 ||
             options.foreign_driver_count != 0
@@ -239,8 +249,22 @@ flag_handler(
     ) {
         flag_handler_options_free(&options);
         return flag_handler_error(
-            "--format cannot be combined with other output modes, -O1, -o, or linker options"
+            "--format cannot be combined with other output modes, optimization/debug flags, -o, or linker options"
         );
+    }
+
+    if (
+        options.debug &&
+        (options.ast || options.tokens || options.format)
+    ) {
+        flag_handler_options_free(&options);
+        return flag_handler_error(
+            "-debug cannot be combined with --ast, --tokens, or --format"
+        );
+    }
+
+    if (options.debug && !optimize_explicit) {
+        options.optimize = 0;
     }
 
     return (flag_handler_result) {
@@ -314,7 +338,9 @@ flag_handler_print_help(
         "  --asm               Print assembly output instead of building an executable.\n"
         "  --format            Format source files in place (requires clang-format).\n"
         "  -o <path>           Write the executable to <path> (default: a.out).\n"
-        "  -O1                 Enable lightweight assembly optimizations.\n"
+        "  -optimize           Optimize IR and use -Os/LTO release linking by default.\n"
+        "  -release            Alias for -optimize; strip release symbols.\n"
+        "  -debug              Emit debug information and retain symbols; disable optimization unless requested.\n"
         "  -L<path>            Add a library search path.\n"
         "  -l<name>            Link a library.\n"
         "  -foreign <lang>=<driver> Select the driver for a foreign language (e.g. c=clang).\n"
@@ -329,7 +355,7 @@ flag_handler_print_help(
         "  %s --ast program.lowc\n"
         "  %s --asm program.lowc\n"
         "  %s --format program.lowc\n"
-        "  %s -O1 -o program program.lowc\n"
+        "  %s -optimize -o program program.lowc\n"
         "  %s --target=x86_64 program.lowc\n"
         "\n",
         program,

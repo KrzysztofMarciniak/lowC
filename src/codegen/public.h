@@ -2,7 +2,7 @@
 #define LOWC_CODEGEN_PUBLIC_H
 
 #include "../flag_handler/public.h"
-#include "../parser/public.h"
+#include "../ir/public.h"
 
 typedef struct codegen_result
 {
@@ -26,7 +26,7 @@ typedef struct codegen_result
 } codegen_result;
 
 codegen_result codegen(
-    ast *tree,
+    ir_module *module,
     flag_handler_options *options
 );
 

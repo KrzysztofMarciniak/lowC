@@ -55,7 +55,17 @@ flag_handler_is_optimize(
     const char *flag
 )
 {
-    return strcmp(flag, "-O1") == 0;
+    return
+        strcmp(flag, "-optimize") == 0 ||
+        strcmp(flag, "-release") == 0;
+}
+
+int
+flag_handler_is_debug(
+    const char *flag
+)
+{
+    return strcmp(flag, "-debug") == 0;
 }
 
 int

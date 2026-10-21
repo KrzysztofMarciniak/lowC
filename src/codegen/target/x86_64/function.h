@@ -3,6 +3,7 @@
 
 #include "../../../parser/public.h"
 #include "context.h"
+#include "../../../ir/public.h"
 
 
 /*
@@ -19,7 +20,7 @@
 void
 codegen_x86_64_function(
     codegen_x86_64_context *context,
-    ast *function
+    const ir_function *function
 );
 
 #endif

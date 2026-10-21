@@ -11,6 +11,7 @@
 #include "lexer/public.h"
 #include "parser/public.h"
 #include "semantic/public.h"
+#include "ir/public.h"
 #include "codegen/public.h"
 #include "output/public.h"
 #include "formatter/public.h"
@@ -151,12 +152,33 @@ main(
         return 1;
     }
 
+    ir_result ir_result =
+        ir_lower(
+            parser_result.tree,
+            flag_result.options.optimize
+        );
+
+    if (ir_result.error)
+    {
+        fprintf(
+            stderr,
+            "IR error: %s\n",
+            ir_result.error_text
+                ? ir_result.error_text
+                : "IR lowering failed"
+        );
+        ir_result_free(&ir_result);
+        flag_handler_options_free(&flag_result.options);
+        return 1;
+    }
+
 
     codegen_result codegen_result =
         codegen(
-            parser_result.tree,
+            ir_result.module,
             &flag_result.options
         );
+    ir_result_free(&ir_result);
 
     if (codegen_result.error)
     {

@@ -91,6 +91,61 @@ codegen_make_label(
     return codegen_strdup(buffer);
 }
 
+unsigned long
+codegen_debug_file_id(
+    codegen_context *context,
+    const char *path
+)
+{
+    const char **new_files;
+    unsigned long id;
+
+    if (!context || !path || !context->debug) {
+        return 0;
+    }
+
+    for (unsigned long index = 0;
+         index < context->debug_file_count;
+         index++)
+    {
+        if (strcmp(context->debug_files[index], path) == 0) {
+            return index + 1;
+        }
+    }
+
+    new_files = realloc(
+        context->debug_files,
+        sizeof(*new_files) * (size_t)(context->debug_file_count + 1)
+    );
+    if (!new_files) {
+        codegen_fail(context, "failed to allocate debug source file table");
+        return 0;
+    }
+
+    context->debug_files = new_files;
+    context->debug_files[context->debug_file_count] = path;
+    id = ++context->debug_file_count;
+
+    codegen_output_printf(&context->output, ".file %lu \"", id);
+    for (const unsigned char *character =
+             (const unsigned char *)path;
+         *character != '\0';
+         character++)
+    {
+        if (*character == '\\' || *character == '"') {
+            codegen_output_write(&context->output, "\\");
+        }
+        codegen_output_printf(
+            &context->output,
+            "%c",
+            (int)*character
+        );
+    }
+    codegen_output_write(&context->output, "\"\n");
+
+    return id;
+}
+
 static int
 codegen_constant_integer(
     ast *expression,
@@ -372,6 +427,27 @@ codegen_emit_process_args_bridge(
     return 0;
 }
 
+static const ir_function *
+codegen_find_lowered_function(
+    const ir_module *module,
+    const ast *declaration
+)
+{
+    for (unsigned long index = 0;
+         index < module->lowered_function_count;
+         index++)
+    {
+        if (
+            module->lowered_functions[index].declaration ==
+            declaration
+        ) {
+            return &module->lowered_functions[index];
+        }
+    }
+
+    return NULL;
+}
+
 
 int
 codegen_generate_node(
@@ -433,6 +509,19 @@ codegen_generate_node(
         case AST_FUNCTION:
         {
             codegen_x86_64_context x86_context;
+            const ir_function *lowered_function =
+                codegen_find_lowered_function(
+                    context->module,
+                    node
+                );
+
+            if (!lowered_function) {
+                codegen_fail(
+                    context,
+                    "function is missing from lowered IR"
+                );
+                return 1;
+            }
 
             /*
              * The generic codegen output buffer remains owned
@@ -444,6 +533,12 @@ codegen_generate_node(
                 &context->output
             );
             x86_context.optimize = context->optimize;
+            x86_context.debug = context->debug;
+            x86_context.debug_file_id =
+                codegen_debug_file_id(
+                    context,
+                    node->file
+                );
             x86_context.label_count = context->label_counter;
             x86_context.structs = context->structs;
             x86_context.globals = context->globals;
@@ -451,7 +546,7 @@ codegen_generate_node(
 
             codegen_x86_64_function(
                 &x86_context,
-                node
+                lowered_function
             );
             context->label_counter = x86_context.label_count;
 
@@ -537,8 +632,14 @@ codegen_generate_program(
     }
 
     if (
-        strcmp(entrypoint->function.return_type, "void") != 0 ||
-        entrypoint->function.return_pointer_depth != 0
+        entrypoint->function.return_types.count != 1 ||
+        strcmp(
+            entrypoint->function.return_types.values[0]
+                ->return_type.type,
+            "void"
+        ) != 0 ||
+        entrypoint->function.return_types.values[0]
+            ->return_type.pointer_depth != 0
     ) {
         codegen_fail(context, "entrypoint must return void");
         return 1;
@@ -546,6 +647,7 @@ codegen_generate_program(
 
     codegen_output_write(
         &context->output,
+        ".section .text.main,\"ax\",@progbits\n"
         ".globl main\n"
         ".type main, @function\n"
         "main:\n"
@@ -576,19 +678,20 @@ codegen_generate_program(
 
 codegen_result
 codegen(
-    ast *tree,
+    ir_module *module,
     flag_handler_options *options
 )
 {
     codegen_result result = {0};
     codegen_context context = {0};
+    ast ir_tree;
 
-    if (!tree){
+    if (!module || !module->source_program){
         result.error = 1;
 
         result.error_text =
             codegen_strdup(
-                "cannot generate code from null AST"
+                "cannot generate code from null IR module"
             );
 
         return result;
@@ -626,8 +729,15 @@ codegen(
     }
 
     context.result = &result;
+    context.module = module;
     context.optimize = options->optimize;
+    context.debug = options->debug;
     context.executable = options->executable && !options->asm_output;
+
+    ir_tree = *module->source_program;
+    ir_tree.program.structs = module->structs;
+    ir_tree.program.globals = module->globals;
+    ir_tree.program.functions = module->functions;
 
     /*
      * Generic codegen owns the assembly buffer.
@@ -639,7 +749,7 @@ codegen(
     if (
         codegen_generate_program(
             &context,
-            tree
+            &ir_tree
         )
     ){
         if (!result.error){
@@ -669,6 +779,8 @@ codegen(
     codegen_output_free(
         &context.output
     );
+
+    free(context.debug_files);
 
     return result;
 }

@@ -354,6 +354,14 @@ semantic(
                 goto cleanup;
             }
 
+            if (function->function.return_types.count != 1) {
+                result = semantic_error(
+                    function,
+                    "C foreign functions must have exactly one return type"
+                );
+                goto cleanup;
+            }
+
             if (function->function.parameters.count > 6) {
                 result = semantic_error(
                     function,
@@ -363,8 +371,10 @@ semantic(
             }
 
             if (!semantic_c_abi_value_type(
-                    function->function.return_type,
-                    function->function.return_pointer_depth,
+                    function->function.return_types.values[0]
+                        ->return_type.type,
+                    function->function.return_types.values[0]
+                        ->return_type.pointer_depth,
                     1
                 )) {
                 result = semantic_error(
@@ -395,6 +405,13 @@ semantic(
                 }
             }
         }
+        else if (function->function.parameters.count > 6) {
+            result = semantic_error(
+                function,
+                "lowC functions support at most six parameters"
+            );
+            goto cleanup;
+        }
 
         signature = semantic_function_create(
             function,
@@ -412,19 +429,41 @@ semantic(
             goto cleanup;
         }
 
-        if (
-            !semantic_type_name_is_visible(
-                &context,
-                function->file,
-                function->function.return_type
-            )
+        for (
+            unsigned long return_index = 0;
+            return_index < function->function.return_types.count;
+            return_index++
         ) {
-            semantic_function_free(signature);
-            result = semantic_error(
-                function,
-                "function return type is not imported"
-            );
-            goto cleanup;
+            ast *return_type =
+                function->function.return_types.values[return_index];
+
+            if (
+                !semantic_type_name_is_visible(
+                    &context,
+                    function->file,
+                    return_type->return_type.type
+                )
+            ) {
+                semantic_function_free(signature);
+                result = semantic_error(
+                    function,
+                    "function return type is not imported"
+                );
+                goto cleanup;
+            }
+
+            if (
+                signature->return_type_count > 1 &&
+                signature->return_types[return_index]->kind ==
+                    SEMANTIC_TYPE_VOID
+            ) {
+                semantic_function_free(signature);
+                result = semantic_error(
+                    function,
+                    "void cannot be one of multiple return values"
+                );
+                goto cleanup;
+            }
         }
 
         for (

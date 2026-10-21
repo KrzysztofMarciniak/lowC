@@ -40,11 +40,16 @@ the default C compiler driver links `printf` from the standard library.
 ## 3. Compile and run it
 
 ```sh
-build/lowc -O1 -o hello hello.lowc
+build/lowc -optimize -o hello hello.lowc
 ./hello
 ```
 
-`-o hello` chooses the executable's name. `-O1` enables lightweight integer constant folding; omit it to use the straightforward unoptimized path. If you leave off `-o`, the executable is named `a.out`.
+`-o hello` chooses the executable's name. Normal builds optimize by default;
+`-optimize` (also spelled `-release`) requests release linking explicitly.
+Release executables use `-Os`, LTO, dead-section removal, and symbol stripping.
+Use `-debug` for source-mapped debug information; it disables optimization and
+stripping unless combined with `-optimize` or `-release`. If you leave off
+`-o`, the executable is named `a.out`.
 
 The compiler asks the system C compiler driver to assemble and link the generated x86-64 code. By default it uses `cc`; set `CC` to use another compatible driver:
 

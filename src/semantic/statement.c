@@ -319,6 +319,84 @@ semantic_check_assembly(
     return 0;
 }
 
+static int
+semantic_check_multi_assignment(
+    semantic_context *context,
+    ast *statement,
+    char **error_text
+)
+{
+    semantic_function *signature;
+    unsigned long index;
+
+    if (
+        statement->multi_assignment.value == NULL ||
+        statement->multi_assignment.value->type != AST_CALL
+    ) {
+        *error_text = semantic_strdup(
+            "tuple assignment requires a function call"
+        );
+        return 1;
+    }
+
+    signature = semantic_check_call_signature(
+        context,
+        statement->multi_assignment.value,
+        error_text
+    );
+    if (signature == NULL)
+        return 1;
+
+    if (
+        signature->return_type_count !=
+        statement->multi_assignment.targets.count
+    ) {
+        *error_text = semantic_strdup(
+            "tuple assignment has the wrong number of targets"
+        );
+        return 1;
+    }
+
+    for (
+        index = 0;
+        index < statement->multi_assignment.targets.count;
+        index++
+    ) {
+        ast *target = statement->multi_assignment.targets.values[index];
+        semantic_type *target_type;
+
+        if (!semantic_expression_is_lvalue(target)) {
+            *error_text = semantic_strdup(
+                "tuple assignment target is not assignable"
+            );
+            return 1;
+        }
+
+        target_type = semantic_check_expression(
+            context,
+            target,
+            error_text
+        );
+        if (target_type == NULL)
+            return 1;
+
+        if (!semantic_type_assignable(
+                target_type,
+                signature->return_types[index]
+            )) {
+            semantic_type_free(target_type);
+            *error_text = semantic_strdup(
+                "tuple assignment target has incompatible type"
+            );
+            return 1;
+        }
+
+        semantic_type_free(target_type);
+    }
+
+    return 0;
+}
+
 
 int
 semantic_check_statement(
@@ -333,6 +411,13 @@ semantic_check_statement(
 
     switch (statement->type)
     {
+        case AST_MULTI_ASSIGNMENT:
+            return semantic_check_multi_assignment(
+                context,
+                statement,
+                error_text
+            );
+
         case AST_VARIABLE_DECLARATION:
         {
             semantic_symbol *symbol;
@@ -583,71 +668,59 @@ semantic_check_statement(
 
         case AST_RETURN:
         {
-            semantic_type *value_type;
-
-
-            value_type = NULL;
-
-
-            if (statement->return_statement.value != NULL)
-            {
-                value_type = semantic_check_expression(
-                    context,
-                    statement->return_statement.value,
-                    error_text
-                );
-
-
-                if (value_type == NULL)
-                    return 1;
-            }
-
-
             if (context->current_function != NULL)
             {
-                semantic_type *expected;
+                unsigned long value_count =
+                    statement->return_statement.values.count;
 
-
-                expected = context->current_function->return_type;
-
-
-                if (value_type == NULL)
-                {
-                    /*
-                     * A bare `return;` is only valid in a function
-                     * that returns void.
-                     */
+                if (value_count == 0) {
                     if (
-                        expected == NULL ||
-                        expected->kind != SEMANTIC_TYPE_VOID
-                    )
-                    {
-                        *error_text = semantic_strdup(
-                            "missing return value"
-                        );
-
-                        return 1;
+                        context->current_function->return_type_count == 1 &&
+                        context->current_function->return_types[0]->kind ==
+                            SEMANTIC_TYPE_VOID
+                    ) {
+                        return 0;
                     }
-                }
-                else if (
-                    !semantic_type_assignable(
-                        expected,
-                        value_type
-                    )
-                )
-                {
-                    semantic_type_free(value_type);
-
                     *error_text = semantic_strdup(
-                        "return value has incompatible type"
+                        "missing return value"
                     );
-
                     return 1;
                 }
+
+                if (
+                    value_count !=
+                    context->current_function->return_type_count
+                ) {
+                    *error_text = semantic_strdup(
+                        "return statement has the wrong number of values"
+                    );
+                    return 1;
+                }
+
+                for (i = 0; i < value_count; i++) {
+                    semantic_type *value_type = semantic_check_expression(
+                        context,
+                        statement->return_statement.values.values[i],
+                        error_text
+                    );
+
+                    if (value_type == NULL)
+                        return 1;
+
+                    if (!semantic_type_assignable(
+                            context->current_function->return_types[i],
+                            value_type
+                        )) {
+                        semantic_type_free(value_type);
+                        *error_text = semantic_strdup(
+                            "return value has incompatible type"
+                        );
+                        return 1;
+                    }
+
+                    semantic_type_free(value_type);
+                }
             }
-
-
-            semantic_type_free(value_type);
 
             return 0;
         }

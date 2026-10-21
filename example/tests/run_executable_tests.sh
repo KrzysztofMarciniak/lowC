@@ -320,21 +320,62 @@ then
 fi
 
 if ! "$BIN" "$SCRIPT_DIR/23_runtime.lowc" \
-    -O1 -o "$TEMP_DIR/program with space"
+    -optimize -o "$TEMP_DIR/program with space"
 then
     echo "FAIL [executable] compiler invocation"
     exit 1
 fi
 
 if ! "$BIN" "$SCRIPT_DIR/23_runtime.lowc" \
-    -o "$TEMP_DIR/program-unoptimized"
+    -debug -o "$TEMP_DIR/program-unoptimized"
 then
     echo "FAIL [executable] unoptimized compiler invocation"
     exit 1
 fi
 
+if ! "$BIN" "$SCRIPT_DIR/23_runtime.lowc" \
+    -release -o "$TEMP_DIR/program-release"
+then
+    echo "FAIL [executable] -release alias"
+    exit 1
+fi
+
+if nm -a "$TEMP_DIR/program-release" 2>/dev/null | grep -q ' main$'; then
+    echo "FAIL [executable] optimized release output was not stripped"
+    exit 1
+fi
+
+if ! nm -a "$TEMP_DIR/program-unoptimized" 2>/dev/null | grep -q ' main$'; then
+    echo "FAIL [executable] debug output did not retain symbols"
+    exit 1
+fi
+
 if ! "$TEMP_DIR/program with space"; then
     echo "FAIL [executable] optimized program did not run successfully"
+    exit 1
+fi
+
+if ! "$TEMP_DIR/program-release"; then
+    echo "FAIL [executable] -release program did not run successfully"
+    exit 1
+fi
+
+for removed_flag in -O0 -O1; do
+    if "$BIN" "$removed_flag" --asm "$SCRIPT_DIR/23_runtime.lowc" \
+        >"$TEMP_DIR/old-optimization-flag.out" 2>&1 ||
+       ! grep -q "unknown flag" "$TEMP_DIR/old-optimization-flag.out"
+    then
+        echo "FAIL [flags] accepted removed $removed_flag option"
+        exit 1
+    fi
+done
+
+"$BIN" --asm -debug "$SCRIPT_DIR/23_runtime.lowc" \
+    >"$TEMP_DIR/debug-info.s" || exit 1
+if ! grep -q '^\.file ' "$TEMP_DIR/debug-info.s" ||
+   ! grep -q '\.loc ' "$TEMP_DIR/debug-info.s"
+then
+    echo "FAIL [debug] assembly lacked source mapping directives"
     exit 1
 fi
 
@@ -399,6 +440,59 @@ then
     exit 1
 fi
 
+mkdir -p "$TEMP_DIR/ir-pruning"
+cat >"$TEMP_DIR/ir-pruning/dependencies.lowc" <<'EOF'
+s8 live_helper(s8 value) {
+    return value + 1;
+}
+
+s8 live_api(s8 value) {
+    return live_helper(value);
+}
+
+s8 dead_helper(s8 value) {
+    return value + 100;
+}
+
+s8 dead_api(s8 value) {
+    return dead_helper(value);
+}
+EOF
+
+cat >"$TEMP_DIR/ir-pruning/main.lowc" <<'EOF'
+#include "dependencies.lowc" : "live_api", "dead_api";
+
+s8 root_unused(void) {
+    return 99;
+}
+
+void entrypoint(void) {
+    s8 result = live_api(4);
+    return;
+}
+EOF
+
+if ! "$BIN" --asm "$TEMP_DIR/ir-pruning/main.lowc" \
+    >"$TEMP_DIR/ir-pruning.s"
+then
+    echo "FAIL [IR] could not lower module dependency graph"
+    exit 1
+fi
+
+for retained in entrypoint root_unused live_api live_helper; do
+    if ! grep -q "^${retained}:" "$TEMP_DIR/ir-pruning.s"; then
+        echo "FAIL [IR] required root or transitive declaration '$retained' was pruned"
+        exit 1
+    fi
+done
+
+for removed in dead_api dead_helper; do
+    if grep -q "^${removed}:" "$TEMP_DIR/ir-pruning.s"; then
+        echo "FAIL [IR] unused imported declaration '$removed' was emitted"
+        exit 1
+    fi
+done
+
 for hidden_case in function global struct dependency; do
     if "$BIN" --asm "$MODULE_ACCESS_DIR/hidden_${hidden_case}.lowc" \
         >"$TEMP_DIR/hidden-${hidden_case}.out" 2>&1
@@ -416,14 +510,146 @@ for hidden_case in function global struct dependency; do
     fi
 done
 
-"$BIN" --asm "$SCRIPT_DIR/23_runtime.lowc" >"$TEMP_DIR/unoptimized.s" || exit 1
-"$BIN" --asm -O1 "$SCRIPT_DIR/23_runtime.lowc" >"$TEMP_DIR/optimized.s" || exit 1
+"$BIN" --asm -debug "$SCRIPT_DIR/23_runtime.lowc" >"$TEMP_DIR/unoptimized.s" || exit 1
+"$BIN" --asm -optimize "$SCRIPT_DIR/23_runtime.lowc" >"$TEMP_DIR/optimized.s" || exit 1
+"$BIN" --asm "$SCRIPT_DIR/23_runtime.lowc" >"$TEMP_DIR/default.s" || exit 1
+"$BIN" --asm -debug -optimize "$SCRIPT_DIR/23_runtime.lowc" \
+    >"$TEMP_DIR/debug-optimized.s" || exit 1
 
 unoptimized_pushes=$(grep -c 'push rax' "$TEMP_DIR/unoptimized.s" || true)
 optimized_pushes=$(grep -c 'push rax' "$TEMP_DIR/optimized.s" || true)
+default_pushes=$(grep -c 'push rax' "$TEMP_DIR/default.s" || true)
+debug_optimized_pushes=$(grep -c 'push rax' "$TEMP_DIR/debug-optimized.s" || true)
 
 if [ "$optimized_pushes" -ge "$unoptimized_pushes" ]; then
     echo "FAIL [optimization] optimized assembly did not reduce stack traffic"
+    exit 1
+fi
+if [ "$default_pushes" -ne "$optimized_pushes" ]; then
+    echo "FAIL [optimization] optimization was not enabled by default"
+    exit 1
+fi
+if [ "$debug_optimized_pushes" -ne "$optimized_pushes" ]; then
+    echo "FAIL [optimization] -debug -optimize did not keep optimization enabled"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/constant-branch.lowc" <<'EOF'
+void entrypoint(void) {
+    if (1) {
+        return;
+    } else {
+        return;
+    }
+}
+EOF
+
+if ! "$BIN" --asm -debug "$TEMP_DIR/constant-branch.lowc" \
+    >"$TEMP_DIR/constant-branch-unoptimized.s" ||
+   ! "$BIN" --asm -optimize "$TEMP_DIR/constant-branch.lowc" \
+    >"$TEMP_DIR/constant-branch-optimized.s" ||
+   ! grep -q 'jne .L' "$TEMP_DIR/constant-branch-unoptimized.s" ||
+   grep -q 'jne .L' "$TEMP_DIR/constant-branch-optimized.s"
+then
+    echo "FAIL [optimization] constant branch was not simplified"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/constant-call.lowc" <<'EOF'
+u1 result_x = 0;
+u1 result_y = 0;
+
+u1, u1 minushundred(u1 first, u1 second) {
+    return first - 100, second - 100;
+}
+
+void consume(u1 value) {
+    return;
+}
+
+void text(u1 *message) {
+    return;
+}
+
+void entrypoint(void) {
+    u1 x = 100;
+    u1 y = 200;
+    text("before");
+    consume(x);
+    consume(y);
+    (x, y) = minushundred(x, y);
+    text("after");
+    consume(x);
+    consume(y);
+    result_x = x;
+    result_y = y;
+    return;
+}
+EOF
+
+cat >"$TEMP_DIR/constant-call-harness.c" <<'EOF'
+extern unsigned char result_x;
+extern unsigned char result_y;
+void entrypoint(void);
+
+int
+main(void)
+{
+    entrypoint();
+    return result_x == 0 && result_y == 100 ? 0 : 1;
+}
+EOF
+
+if ! "$BIN" --asm -debug "$TEMP_DIR/constant-call.lowc" \
+    >"$TEMP_DIR/constant-call-unoptimized.s" ||
+   ! "$BIN" --asm -optimize "$TEMP_DIR/constant-call.lowc" \
+    >"$TEMP_DIR/constant-call-optimized.s" ||
+   ! grep -q 'call minushundred' "$TEMP_DIR/constant-call-unoptimized.s" ||
+   grep -q 'call minushundred' "$TEMP_DIR/constant-call-optimized.s"
+then
+    echo "FAIL [optimization] pure constant multi-return call was not precomputed"
+    exit 1
+fi
+
+for mode in unoptimized optimized; do
+    if ! cc -x assembler "$TEMP_DIR/constant-call-$mode.s" -x c \
+        "$TEMP_DIR/constant-call-harness.c" \
+        -o "$TEMP_DIR/constant-call-$mode" ||
+       ! "$TEMP_DIR/constant-call-$mode"
+    then
+        echo "FAIL [optimization] $mode constant-call result changed program behavior"
+        exit 1
+    fi
+done
+
+if ! "$BIN" -debug -optimize "$TEMP_DIR/constant-call.lowc" \
+    -o "$TEMP_DIR/constant-call-release-debug" ||
+   nm -a "$TEMP_DIR/constant-call-release-debug" 2>/dev/null \
+       | grep -q ' minushundred$'
+then
+    echo "FAIL [optimization] release linker retained the precomputed function"
+    exit 1
+fi
+
+if ! "$BIN" -debug "$TEMP_DIR/constant-call.lowc" \
+    -o "$TEMP_DIR/constant-call-debug"
+then
+    echo "FAIL [optimization] could not build the unoptimized size fixture"
+    exit 1
+fi
+
+unoptimized_text_size=$(
+    size "$TEMP_DIR/constant-call-debug" | awk 'NR == 2 { print $1 }'
+)
+optimized_text_size=$(
+    size "$TEMP_DIR/constant-call-release-debug" |
+        awk 'NR == 2 { print $1 }'
+)
+if [ -z "$unoptimized_text_size" ] ||
+   [ -z "$optimized_text_size" ] ||
+   [ "$optimized_text_size" -ge "$unoptimized_text_size" ]
+then
+    echo "FAIL [optimization] precomputed release did not reduce executable text size"
     exit 1
 fi
 
@@ -448,6 +674,111 @@ fi
 
 if ! "$TEMP_DIR/harness-unoptimized"; then
     echo "FAIL [runtime] unoptimized functions returned incorrect results"
+    exit 1
+fi
+
+for mode in unoptimized optimized; do
+    if [ "$mode" = optimized ]; then
+        optimization=-optimize
+    else
+        optimization=-debug
+    fi
+
+    if ! "$BIN" --asm $optimization \
+        "$SCRIPT_DIR/27_multiple_returns.lowc" \
+        >"$TEMP_DIR/multiple-returns-$mode.s" ||
+       ! cc -x assembler "$TEMP_DIR/multiple-returns-$mode.s" -x c \
+           "$SCRIPT_DIR/multiple_returns_harness.c" \
+           -o "$TEMP_DIR/multiple-returns-$mode" ||
+       ! "$TEMP_DIR/multiple-returns-$mode"
+    then
+        echo "FAIL [multiple returns] $mode values were not returned and destructured correctly"
+        exit 1
+    fi
+done
+
+cat >"$TEMP_DIR/multiple-return-count.lowc" <<'EOF'
+u1, u1 pair(void) {
+    return 1;
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/multiple-return-count.lowc" \
+    >"$TEMP_DIR/multiple-return-count.out" 2>&1 ||
+   ! grep -q "wrong number of values" \
+       "$TEMP_DIR/multiple-return-count.out"
+then
+    echo "FAIL [multiple returns] accepted a return statement with the wrong number of values"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/multiple-return-targets.lowc" <<'EOF'
+u1, u1 pair(void) {
+    return 1, 2;
+}
+
+void entrypoint(void) {
+    u1 first = 0;
+    u1 second = 0;
+    u1 third = 0;
+    (first, second, third) = pair();
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/multiple-return-targets.lowc" \
+    >"$TEMP_DIR/multiple-return-targets.out" 2>&1 ||
+   ! grep -q "wrong number of targets" \
+       "$TEMP_DIR/multiple-return-targets.out"
+then
+    echo "FAIL [multiple returns] accepted tuple assignment with the wrong number of targets"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/multiple-return-type.lowc" <<'EOF'
+u1, u1 pair(void) {
+    return 1, 2;
+}
+
+void entrypoint(void) {
+    u1 first = 0;
+    u1 *second = 0;
+    (first, second) = pair();
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/multiple-return-type.lowc" \
+    >"$TEMP_DIR/multiple-return-type.out" 2>&1 ||
+   ! grep -q "incompatible type" "$TEMP_DIR/multiple-return-type.out"
+then
+    echo "FAIL [multiple returns] accepted a tuple target with an incompatible type"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/foreign-multiple-return.lowc" <<'EOF'
+foreign c u1, u1 invalid_foreign(void);
+EOF
+
+if "$BIN" --ast "$TEMP_DIR/foreign-multiple-return.lowc" \
+    >"$TEMP_DIR/foreign-multiple-return.out" 2>&1 ||
+   ! grep -q "foreign functions must declare exactly one return type" \
+       "$TEMP_DIR/foreign-multiple-return.out"
+then
+    echo "FAIL [foreign C] accepted multiple return types"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/too-many-lowc-parameters.lowc" <<'EOF'
+u8 unsupported(u8 a, u8 b, u8 c, u8 d, u8 e, u8 f, u8 g) {
+    return a;
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/too-many-lowc-parameters.lowc" \
+    >"$TEMP_DIR/too-many-lowc-parameters.out" 2>&1 ||
+   ! grep -q "lowC functions support at most six parameters" \
+       "$TEMP_DIR/too-many-lowc-parameters.out"
+then
+    echo "FAIL [functions] accepted more than six lowC function parameters"
     exit 1
 fi
 
@@ -481,9 +812,9 @@ EOF
 
 for mode in unoptimized optimized; do
     if [ "$mode" = optimized ]; then
-        optimization=-O1
+        optimization=-optimize
     else
-        optimization=
+        optimization=-debug
     fi
 
     if ! "$BIN" "$TEMP_DIR/standard-library-print.lowc" $optimization \
@@ -590,9 +921,9 @@ EOF
 
 for mode in unoptimized optimized; do
     if [ "$mode" = optimized ]; then
-        optimization=-O1
+        optimization=-optimize
     else
-        optimization=
+        optimization=-debug
     fi
 
     if ! "$BIN" --asm $optimization \
@@ -689,9 +1020,9 @@ EOF
 
 for mode in unoptimized optimized; do
     if [ "$mode" = optimized ]; then
-        optimization=-O1
+        optimization=-optimize
     else
-        optimization=
+        optimization=-debug
     fi
 
     if ! "$BIN" --asm $optimization "$TEMP_DIR/standard-library-data.lowc" \
@@ -785,9 +1116,9 @@ EOF
 
 for mode in unoptimized optimized; do
     if [ "$mode" = optimized ]; then
-        optimization=-O1
+        optimization=-optimize
     else
-        optimization=
+        optimization=-debug
     fi
 
     if ! "$BIN" "$TEMP_DIR/standard-library-args.lowc" $optimization \
@@ -871,6 +1202,8 @@ fi
 
 echo "ok   [modules] imported functions, structs, and globals assemble, link, and run"
 echo "ok   [modules] unimported functions, structs, and globals are rejected"
+echo "ok   [IR] unused imported declarations are pruned with transitive dependencies preserved"
+echo "ok   [optimization] constant folding and branch simplification work"
 echo "ok   [executable] optimized and unoptimized output assembles, links, and runs"
 echo "ok   [standard library] installed print module writes exact output"
 echo "ok   [standard library] CLI arguments include argv[0] and are bounds checked"

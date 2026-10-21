@@ -1,9 +1,11 @@
 #include "function.h"
 #include "statement.h"
+#include "expression.h"
 #include "type.h"
 
 #include "../../output.h"
 
+#include <limits.h>
 #include <stdlib.h>
 
 
@@ -176,14 +178,22 @@ emit_function_signature(
     unsigned long i;
 
 
-    /*
-     * Return type.
-     */
-    emit_type(
-        context->output,
-        function->function.return_type,
-        function->function.return_pointer_depth
-    );
+    for (
+        i = 0;
+        i < function->function.return_types.count;
+        i++
+    ) {
+        ast *return_type = function->function.return_types.values[i];
+
+        if (i != 0)
+            codegen_output_write(context->output, ", ");
+
+        emit_type(
+            context->output,
+            return_type->return_type.type,
+            return_type->return_type.pointer_depth
+        );
+    }
 
 
     codegen_output_printf(
@@ -578,6 +588,9 @@ reset_function_locals(
     context->stack_size = 0;
     context->stack_depth = 0;
     context->has_epilogue_label = 0;
+    context->return_buffer_offset = 0;
+    context->has_return_buffer = 0;
+    context->current_function = NULL;
 }
 
 
@@ -587,20 +600,23 @@ reset_function_locals(
 void
 codegen_x86_64_function(
     codegen_x86_64_context *context,
-    ast *function
+    const ir_function *lowered_function
 )
 {
+    ast *function;
     unsigned long i;
     unsigned long frame_size;
 
 
     if (
         !context ||
-        !function
+        !lowered_function ||
+        !lowered_function->declaration
     ){
         return;
     }
 
+    function = lowered_function->declaration;
 
     /*
      * Make sure this context starts clean for the
@@ -609,6 +625,8 @@ codegen_x86_64_function(
     reset_function_locals(
         context
     );
+    context->current_function = function;
+    context->ir_function = lowered_function;
 
 
     /*
@@ -620,6 +638,12 @@ codegen_x86_64_function(
      * code generation can access them through their normal
      * rbp-relative stack locations.
      */
+    if (function->function.return_types.count > 1) {
+        context->stack_size = align_up(context->stack_size, 8) + 8;
+        context->return_buffer_offset = -(long)context->stack_size;
+        context->has_return_buffer = 1;
+    }
+
     for (
         i = 0;
         i < function->function.parameters.count;
@@ -695,7 +719,12 @@ codegen_x86_64_function(
 );
     codegen_output_printf(
         context->output,
-        ".globl %s\n",
+    ".section .text.%s,\"ax\",@progbits\n",
+    function->function.name
+);
+codegen_output_printf(
+    context->output,
+    ".globl %s\n",
         function->function.name
     );
 
@@ -718,6 +747,7 @@ codegen_x86_64_function(
         function->function.name
     );
 
+    codegen_x86_64_emit_location(context, function);
 
     /*
      * ------------------------------------------------------------
@@ -769,6 +799,14 @@ codegen_x86_64_function(
         "\n"
     );
 
+    if (context->has_return_buffer) {
+        codegen_output_printf(
+            context->output,
+            "    mov QWORD PTR [rbp%+ld], r10\n\n",
+            context->return_buffer_offset
+        );
+    }
+
 
     /*
      * ------------------------------------------------------------
@@ -788,12 +826,85 @@ codegen_x86_64_function(
      * Function body
      * ------------------------------------------------------------
      */
-    if (function->function.body){
+    {
+        unsigned long first_block_label = context->label_count;
+        context->label_count += lowered_function->block_count;
 
-        codegen_x86_64_statement(
-            context,
-            function->function.body
-        );
+        for (unsigned long block_index = 0;
+             block_index < lowered_function->block_count;
+             block_index++)
+        {
+            const ir_basic_block *block =
+                &lowered_function->blocks[block_index];
+
+            codegen_output_printf(
+                context->output,
+                ".L%lu:\n",
+                first_block_label + block_index
+            );
+
+            for (unsigned long instruction_index = 0;
+                 instruction_index < block->instruction_count;
+                 instruction_index++)
+            {
+                const ir_instruction *instruction =
+                    &block->instructions[instruction_index];
+                codegen_x86_64_ir_statement(
+                    context,
+                    lowered_function,
+                    instruction
+                );
+            }
+
+            switch (block->terminator.kind) {
+                case IR_TERMINATOR_BRANCH:
+                {
+                    const ir_value *condition =
+                        &lowered_function->values[
+                            block->terminator.condition_value
+                        ];
+                    codegen_x86_64_emit_location(
+                        context,
+                        condition->source
+                    );
+                    codegen_x86_64_ir_expression_id(
+                        context,
+                        block->terminator.condition_value
+                    );
+                    codegen_output_write(
+                        context->output,
+                        "    cmp rax, 0\n"
+                    );
+                    codegen_output_printf(
+                        context->output,
+                        "    jne .L%lu\n"
+                        "    jmp .L%lu\n",
+                        first_block_label +
+                            block->terminator.true_block,
+                        first_block_label +
+                            block->terminator.false_block
+                    );
+                    break;
+                }
+
+                case IR_TERMINATOR_JUMP:
+                    codegen_output_printf(
+                        context->output,
+                        "    jmp .L%lu\n",
+                        first_block_label +
+                            block->terminator.true_block
+                    );
+                    break;
+
+                case IR_TERMINATOR_NONE:
+                    codegen_output_printf(
+                        context->output,
+                        "    jmp .L%lu\n",
+                        context->epilogue_label
+                    );
+                    break;
+            }
+        }
     }
 
 

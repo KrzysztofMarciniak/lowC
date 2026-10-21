@@ -64,7 +64,7 @@ portable:
 quick_start: $(TARGET)
 	@cat QUICK_START.md
 	@printf '\nBuilding and running the example program...\n\n'
-	$(TARGET) -O1 -o $(BUILD_DIR)/quick_start example/quick_start.lowc
+	$(TARGET) -release -o $(BUILD_DIR)/quick_start example/quick_start.lowc
 	@$(BUILD_DIR)/quick_start
 	@printf 'Done. The example ran successfully.\n'
 

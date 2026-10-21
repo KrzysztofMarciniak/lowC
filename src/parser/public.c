@@ -479,17 +479,11 @@ parser_print_ast_node(
             );
 
             parser_print_indent(depth + 1);
-            printf(
-                "return_type: %s\n",
-                tree->function.return_type != NULL
-                    ? tree->function.return_type
-                    : "(null)"
-            );
+            printf("return_types:\n");
 
-            parser_print_indent(depth + 1);
-            printf(
-                "return_pointer_depth: %lu\n",
-                tree->function.return_pointer_depth
+            parser_print_list(
+                &tree->function.return_types,
+                depth + 2
             );
 
             parser_print_indent(depth + 1);
@@ -541,6 +535,25 @@ parser_print_ast_node(
             printf(
                 "pointer_depth: %lu\n",
                 tree->parameter.pointer_depth
+            );
+
+            break;
+
+        case AST_RETURN_TYPE:
+            printf("RETURN_TYPE\n");
+
+            parser_print_indent(depth + 1);
+            printf(
+                "type: %s\n",
+                tree->return_type.type != NULL
+                    ? tree->return_type.type
+                    : "(null)"
+            );
+
+            parser_print_indent(depth + 1);
+            printf(
+                "pointer_depth: %lu\n",
+                tree->return_type.pointer_depth
             );
 
             break;
@@ -676,10 +689,10 @@ parser_print_ast_node(
             printf("RETURN\n");
 
             parser_print_indent(depth + 1);
-            printf("value:\n");
+            printf("values:\n");
 
-            parser_print_ast_node(
-                tree->return_statement.value,
+            parser_print_list(
+                &tree->return_statement.values,
                 depth + 2
             );
 
@@ -701,6 +714,25 @@ parser_print_ast_node(
 
             parser_print_ast_node(
                 tree->assignment.right,
+                depth + 2
+            );
+
+            break;
+
+        case AST_MULTI_ASSIGNMENT:
+            printf("MULTI_ASSIGNMENT\n");
+
+            parser_print_indent(depth + 1);
+            printf("targets:\n");
+            parser_print_list(
+                &tree->multi_assignment.targets,
+                depth + 2
+            );
+
+            parser_print_indent(depth + 1);
+            printf("value:\n");
+            parser_print_ast_node(
+                tree->multi_assignment.value,
                 depth + 2
             );
 

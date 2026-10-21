@@ -615,3 +615,27 @@ codegen_x86_64_struct_field_offset(
 
     return 1;
 }
+
+void
+codegen_x86_64_emit_location(
+    codegen_x86_64_context *context,
+    const ast *node
+)
+{
+    if (
+        context == NULL ||
+        node == NULL ||
+        !context->debug ||
+        context->debug_file_id == 0 ||
+        node->line == 0
+    ) {
+        return;
+    }
+
+    codegen_output_printf(
+        context->output,
+        "    .loc %lu %lu\n",
+        context->debug_file_id,
+        node->line
+    );
+}

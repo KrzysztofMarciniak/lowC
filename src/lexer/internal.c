@@ -188,7 +188,10 @@ lexer_make_token(
             line,
 
         .column =
-            column
+            column,
+
+        .imported =
+            state->file->imported
     };
 }
 
@@ -339,7 +342,8 @@ lexer_identifier(
         .value = value,
         .file = state->file->path,
         .line = line,
-        .column = column
+        .column = column,
+        .imported = state->file->imported
     };
 }
 

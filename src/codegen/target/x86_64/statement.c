@@ -4,6 +4,8 @@
 
 #include "../../output.h"
 
+#include <inttypes.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -319,7 +321,6 @@ emit_expression_source(
     }
 }
 
-
 /*
  * Emit a store to a local variable.
  *
@@ -548,6 +549,556 @@ emit_assignment(
     codegen_output_write(context->output, "    mov QWORD PTR [rcx], rax\n");
 }
 
+static unsigned long
+align_up(
+    unsigned long value,
+    unsigned long alignment
+)
+{
+    unsigned long remainder;
+
+    if (alignment == 0)
+        return value;
+
+    remainder = value % alignment;
+    return remainder == 0 ? value : value + alignment - remainder;
+}
+
+static unsigned long
+multi_return_value_size(
+    codegen_x86_64_context *context,
+    ast *type
+)
+{
+    if (
+        type->return_type.pointer_depth == 0 &&
+        codegen_x86_64_find_struct(
+            context,
+            type->return_type.type
+        ) != NULL
+    ) {
+        return codegen_x86_64_context_type_size(
+            context,
+            type->return_type.type,
+            0
+        );
+    }
+
+    return 8;
+}
+
+static unsigned long
+multi_return_value_alignment(
+    codegen_x86_64_context *context,
+    ast *type
+)
+{
+    if (
+        type->return_type.pointer_depth == 0 &&
+        codegen_x86_64_find_struct(
+            context,
+            type->return_type.type
+        ) != NULL
+    ) {
+        return codegen_x86_64_context_type_alignment(
+            context,
+            type->return_type.type,
+            0
+        );
+    }
+
+    return 8;
+}
+
+static unsigned long
+multi_return_offset(
+    codegen_x86_64_context *context,
+    ast *function,
+    unsigned long return_index
+)
+{
+    unsigned long offset = 0;
+
+    for (unsigned long index = 0; index < return_index; index++) {
+        ast *type = function->function.return_types.values[index];
+        unsigned long size = multi_return_value_size(context, type);
+        unsigned long alignment =
+            multi_return_value_alignment(context, type);
+
+        offset = align_up(offset, alignment);
+        offset += size;
+    }
+
+    {
+        ast *type = function->function.return_types.values[return_index];
+        unsigned long alignment =
+            multi_return_value_alignment(context, type);
+
+        return align_up(offset, alignment);
+    }
+}
+
+static unsigned long
+multi_return_buffer_size(
+    codegen_x86_64_context *context,
+    ast *function
+)
+{
+    unsigned long size = 0;
+
+    for (
+        unsigned long index = 0;
+        index < function->function.return_types.count;
+        index++
+    ) {
+        ast *type = function->function.return_types.values[index];
+        unsigned long alignment =
+            multi_return_value_alignment(context, type);
+        unsigned long value_size = multi_return_value_size(context, type);
+
+        size = align_up(size, alignment);
+        size += value_size;
+    }
+
+    return align_up(size, 16);
+}
+
+static void
+emit_byte_copy(
+    codegen_x86_64_context *context,
+    unsigned long size
+)
+{
+    for (unsigned long index = 0; index < size; index++) {
+        codegen_output_printf(
+            context->output,
+            "    mov dl, BYTE PTR [rsi + %lu]\n"
+            "    mov BYTE PTR [rdi + %lu], dl\n",
+            index,
+            index
+        );
+    }
+}
+
+static void
+emit_multi_assignment(
+    codegen_x86_64_context *context,
+    ast *statement
+)
+{
+    ast *call = statement->multi_assignment.value;
+    ast *function = NULL;
+    unsigned long buffer_size;
+
+    if (
+        call->type != AST_CALL ||
+        call->call.function == NULL ||
+        call->call.function->type != AST_IDENTIFIER ||
+        context->functions == NULL
+    ) {
+        return;
+    }
+
+    for (
+        unsigned long index = 0;
+        index < context->functions->count;
+        index++
+    ) {
+        ast *candidate = context->functions->values[index];
+
+        if (strcmp(
+                candidate->function.name,
+                call->call.function->identifier.name
+            ) == 0) {
+            function = candidate;
+            break;
+        }
+    }
+
+    if (
+        function == NULL ||
+        function->function.return_types.count !=
+            statement->multi_assignment.targets.count
+    ) {
+        return;
+    }
+
+    buffer_size = multi_return_buffer_size(context, function);
+    if (buffer_size == 0)
+        return;
+
+    codegen_output_printf(
+        context->output,
+        "    sub rsp, %lu\n",
+        buffer_size
+    );
+    context->stack_depth += buffer_size;
+
+    codegen_x86_64_expression(context, call);
+
+    for (
+        unsigned long index = 0;
+        index < statement->multi_assignment.targets.count;
+        index++
+    ) {
+        ast *target = statement->multi_assignment.targets.values[index];
+        ast *return_type = function->function.return_types.values[index];
+        const char *target_type;
+        unsigned long target_pointer_depth;
+        unsigned long target_size;
+        unsigned long source_offset = multi_return_offset(
+            context,
+            function,
+            index
+        );
+
+        codegen_x86_64_lvalue_address(context, target);
+        codegen_output_write(context->output, "    push rax\n");
+        context->stack_depth += 8;
+
+        codegen_output_printf(
+            context->output,
+            "    lea rsi, [rsp + %lu]\n",
+            source_offset + 8
+        );
+
+        codegen_output_write(
+            context->output,
+            "    pop rdi\n"
+        );
+        context->stack_depth -= 8;
+
+        if (
+            codegen_x86_64_expression_type(
+                context,
+                target,
+                &target_type,
+                &target_pointer_depth
+            )
+        ) {
+            target_size = codegen_x86_64_context_type_size(
+                context,
+                target_type,
+                target_pointer_depth
+            );
+        } else {
+            target_size = codegen_x86_64_context_type_size(
+                context,
+                return_type->return_type.type,
+                return_type->return_type.pointer_depth
+            );
+        }
+
+        emit_byte_copy(context, target_size);
+    }
+
+    codegen_output_printf(
+        context->output,
+        "    add rsp, %lu\n",
+        buffer_size
+    );
+    context->stack_depth -= buffer_size;
+}
+
+static void
+emit_ir_multi_assignment(
+    codegen_x86_64_context *context,
+    const ir_function *lowered_function,
+    const ir_instruction *instruction
+)
+{
+    unsigned long target_count = instruction->operand_count - 1;
+    const ir_value *call_value = &lowered_function->values[
+        instruction->operand_values[target_count]
+    ];
+    ast *function = NULL;
+    unsigned long buffer_size;
+
+    if (
+        call_value->opcode != IR_VALUE_CALL ||
+        context->functions == NULL
+    ) {
+        return;
+    }
+
+    if (instruction->constant_value_count == target_count) {
+        int can_store_constants = 1;
+
+        for (unsigned long index = 0; index < target_count; index++) {
+            const ir_value *target = &lowered_function->values[
+                instruction->operand_values[index]
+            ];
+            if (
+                target->opcode != IR_VALUE_LOAD ||
+                target->type.pointer_depth != 0 ||
+                target->type.is_array ||
+                codegen_x86_64_type_size(target->type.name, 0) == 0 ||
+                !codegen_x86_64_find_local(context, target->name)
+            ) {
+                can_store_constants = 0;
+                break;
+            }
+        }
+
+        if (can_store_constants) {
+            for (unsigned long index = 0; index < target_count; index++) {
+                const ir_value *target = &lowered_function->values[
+                    instruction->operand_values[index]
+                ];
+                codegen_x86_64_local *local =
+                    codegen_x86_64_find_local(context, target->name);
+                codegen_output_printf(
+                    context->output,
+                    "    mov rax, %" PRIu64 "\n",
+                    instruction->constant_values[index]
+                );
+                emit_local_store(context, local);
+            }
+            return;
+        }
+    }
+
+    for (unsigned long index = 0;
+         index < context->functions->count;
+         index++)
+    {
+        ast *candidate = context->functions->values[index];
+        if (strcmp(candidate->function.name, call_value->name) == 0) {
+            function = candidate;
+            break;
+        }
+    }
+
+    if (
+        function == NULL ||
+        function->function.return_types.count != target_count
+    ) {
+        return;
+    }
+
+    buffer_size = multi_return_buffer_size(context, function);
+    if (buffer_size == 0) {
+        return;
+    }
+
+    codegen_output_printf(
+        context->output,
+        "    sub rsp, %lu\n",
+        buffer_size
+    );
+    context->stack_depth += buffer_size;
+
+    codegen_x86_64_ir_expression_id(
+        context,
+        instruction->operand_values[target_count]
+    );
+
+    for (unsigned long index = 0; index < target_count; index++) {
+        const ir_value *target = &lowered_function->values[
+            instruction->operand_values[index]
+        ];
+        ast *return_type = function->function.return_types.values[index];
+        unsigned long source_offset = multi_return_offset(
+            context,
+            function,
+            index
+        );
+        unsigned long target_size = codegen_x86_64_context_type_size(
+            context,
+            target->type.name,
+            target->type.pointer_depth
+        );
+
+        codegen_x86_64_lvalue_address(
+            context,
+            (ast *)target->source
+        );
+        codegen_output_write(context->output, "    push rax\n");
+        context->stack_depth += 8;
+        codegen_output_printf(
+            context->output,
+            "    lea rsi, [rsp + %lu]\n",
+            source_offset + 8
+        );
+        codegen_output_write(context->output, "    pop rdi\n");
+        context->stack_depth -= 8;
+        if (target_size == 0) {
+            target_size = codegen_x86_64_context_type_size(
+                context,
+                return_type->return_type.type,
+                return_type->return_type.pointer_depth
+            );
+        }
+        emit_byte_copy(context, target_size);
+    }
+
+    codegen_output_printf(
+        context->output,
+        "    add rsp, %lu\n",
+        buffer_size
+    );
+    context->stack_depth -= buffer_size;
+}
+
+static void
+emit_multi_return(
+    codegen_x86_64_context *context,
+    const ir_function *lowered_function,
+    const ir_instruction *instruction
+)
+{
+    ast *function = context->current_function;
+
+    if (
+        function == NULL ||
+        !context->has_return_buffer ||
+        function->function.return_types.count < 2
+    )
+        return;
+
+    for (
+        unsigned long index = 0;
+        index < instruction->operand_count;
+        index++
+    ) {
+        ast *return_type = function->function.return_types.values[index];
+        ast *value = (ast *)lowered_function->values[
+            instruction->operand_values[index]
+        ].source;
+        unsigned long size = codegen_x86_64_context_type_size(
+            context,
+            return_type->return_type.type,
+            return_type->return_type.pointer_depth
+        );
+        unsigned long destination_offset = multi_return_offset(
+            context,
+            function,
+            index
+        );
+        int is_struct =
+            return_type->return_type.pointer_depth == 0 &&
+            codegen_x86_64_find_struct(
+                context,
+                return_type->return_type.type
+            ) != NULL;
+
+        if (is_struct) {
+            codegen_x86_64_lvalue_address(context, value);
+            codegen_output_write(
+                context->output,
+                "    mov rsi, rax\n"
+            );
+            codegen_output_printf(
+                context->output,
+                "    mov rdi, QWORD PTR [rbp%+ld]\n",
+                context->return_buffer_offset
+            );
+            if (destination_offset != 0) {
+                codegen_output_printf(
+                    context->output,
+                    "    add rdi, %lu\n",
+                    destination_offset
+                );
+            }
+            emit_byte_copy(context, size);
+        } else {
+            codegen_x86_64_ir_expression_id(
+                context,
+                instruction->operand_values[index]
+            );
+            codegen_output_printf(
+                context->output,
+                "    mov rdi, QWORD PTR [rbp%+ld]\n",
+                context->return_buffer_offset
+            );
+            if (destination_offset != 0) {
+                codegen_output_printf(
+                    context->output,
+                    "    add rdi, %lu\n",
+                    destination_offset
+                );
+            }
+
+            switch (codegen_x86_64_type_size(
+                return_type->return_type.type,
+                return_type->return_type.pointer_depth
+            )) {
+                case 1:
+                    codegen_output_write(
+                        context->output,
+                        codegen_x86_64_type_signed(
+                            return_type->return_type.type,
+                            return_type->return_type.pointer_depth
+                        )
+                            ? "    movsx rax, al\n"
+                            : "    movzx rax, al\n"
+                    );
+                    break;
+                case 2:
+                    codegen_output_write(
+                        context->output,
+                        codegen_x86_64_type_signed(
+                            return_type->return_type.type,
+                            return_type->return_type.pointer_depth
+                        )
+                            ? "    movsx rax, ax\n"
+                            : "    movzx rax, ax\n"
+                    );
+                    break;
+                case 4:
+                    codegen_output_write(
+                        context->output,
+                        codegen_x86_64_type_signed(
+                            return_type->return_type.type,
+                            return_type->return_type.pointer_depth
+                        )
+                            ? "    movsxd rax, eax\n"
+                            : "    mov eax, eax\n"
+                    );
+                    break;
+            }
+
+            codegen_output_write(
+                context->output,
+                "    mov QWORD PTR [rdi], rax\n"
+            );
+        }
+    }
+
+}
+
+static void
+emit_ir_return(
+    codegen_x86_64_context *context,
+    const ir_function *function,
+    const ir_instruction *instruction
+)
+{
+    codegen_x86_64_emit_location(
+        context,
+        instruction->source
+    );
+    codegen_output_write(
+        context->output,
+        "    # return\n"
+    );
+
+    if (instruction->operand_count > 1) {
+        emit_multi_return(context, function, instruction);
+    } else if (instruction->operand_count == 1) {
+        codegen_x86_64_ir_expression_id(
+            context,
+            instruction->operand_values[0]
+        );
+    }
+
+    codegen_output_printf(
+        context->output,
+        "    jmp .L%lu\n",
+        context->epilogue_label
+    );
+}
+
 static int
 assembly_register_is_callee_saved(
     const char *register_name
@@ -618,12 +1169,19 @@ assembly_low_register(
 static void
 emit_assembly_template(
     codegen_x86_64_context *context,
-    ast *assembly
+    ast *assembly,
+    const ir_instruction *instruction
 )
 {
-    const char *text = assembly->assembly.template;
-    unsigned long output_count = assembly->assembly.outputs.count;
-    unsigned long input_count = assembly->assembly.inputs.count;
+    const char *text = instruction
+        ? instruction->assembly_template
+        : assembly->assembly.template;
+    unsigned long output_count = instruction
+        ? instruction->output_count
+        : assembly->assembly.outputs.count;
+    unsigned long input_count = instruction
+        ? instruction->input_count
+        : assembly->assembly.inputs.count;
     int line_start = 1;
 
     codegen_output_write(context->output, "\n");
@@ -661,9 +1219,13 @@ emit_assembly_template(
                         codegen_output_write(context->output, "    ");
                     codegen_output_write(
                         context->output,
-                        assembly_output_register(
-                            assembly->assembly.outputs.values[operand_index]
-                        )
+                        instruction
+                            ? instruction->output_constraints[operand_index] + 1
+                            : assembly_output_register(
+                                assembly->assembly.outputs.values[
+                                    operand_index
+                                ]
+                            )
                     );
                 } else {
                     operand_index -= output_count;
@@ -672,9 +1234,15 @@ emit_assembly_template(
                             codegen_output_write(context->output, "    ");
                         codegen_output_write(
                             context->output,
-                            assembly_input_register(
-                                assembly->assembly.inputs.values[operand_index]
-                            )
+                            instruction
+                                ? instruction->input_constraints[
+                                    operand_index
+                                ]
+                                : assembly_input_register(
+                                    assembly->assembly.inputs.values[
+                                        operand_index
+                                    ]
+                                )
                         );
                     }
                 }
@@ -788,7 +1356,7 @@ emit_assembly(
         context->stack_depth += 8;
     }
 
-    emit_assembly_template(context, assembly);
+    emit_assembly_template(context, assembly, NULL);
 
     if (stack_padding) {
         codegen_output_write(context->output, "    add rsp, 8\n");
@@ -837,6 +1405,157 @@ emit_assembly(
                 assembly_low_register(size)
             );
         }
+    }
+
+    while (saved_count > 0) {
+        codegen_output_printf(
+            context->output,
+            "    pop %s\n",
+            saved_registers[--saved_count]
+        );
+        context->stack_depth -= 8;
+    }
+}
+
+static void
+emit_ir_assembly(
+    codegen_x86_64_context *context,
+    const ir_function *function,
+    const ir_instruction *instruction
+)
+{
+    const char *saved_registers[5];
+    unsigned long saved_count = 0;
+    int stack_padding;
+
+    codegen_x86_64_emit_location(context, instruction->source);
+
+    for (unsigned long index = 0;
+         index < instruction->output_count;
+         index++)
+    {
+        assembly_save_callee_saved_register(
+            context,
+            instruction->output_constraints[index] + 1,
+            saved_registers,
+            &saved_count
+        );
+    }
+    for (unsigned long index = 0;
+         index < instruction->input_count;
+         index++)
+    {
+        assembly_save_callee_saved_register(
+            context,
+            instruction->input_constraints[index],
+            saved_registers,
+            &saved_count
+        );
+    }
+    for (unsigned long index = 0;
+         index < instruction->clobber_count;
+         index++)
+    {
+        if (
+            strcmp(instruction->clobbers[index], "memory") != 0 &&
+            strcmp(instruction->clobbers[index], "cc") != 0
+        ) {
+            assembly_save_callee_saved_register(
+                context,
+                instruction->clobbers[index],
+                saved_registers,
+                &saved_count
+            );
+        }
+    }
+
+    for (unsigned long index = instruction->output_count; index > 0; index--) {
+        const ir_value *value = &function->values[
+            instruction->operand_values[index - 1]
+        ];
+        codegen_x86_64_lvalue_address(
+            context,
+            (ast *)value->source
+        );
+        codegen_output_write(context->output, "    push rax\n");
+        context->stack_depth += 8;
+    }
+    for (unsigned long index = instruction->input_count; index > 0; index--) {
+        const ir_value *value = &function->values[
+            instruction->operand_values[
+                instruction->output_count + index - 1
+            ]
+        ];
+        codegen_x86_64_expression(
+            context,
+            (ast *)value->source
+        );
+        codegen_output_write(context->output, "    push rax\n");
+        context->stack_depth += 8;
+    }
+
+    for (unsigned long index = 0;
+         index < instruction->input_count;
+         index++)
+    {
+        codegen_output_printf(
+            context->output,
+            "    pop %s\n",
+            instruction->input_constraints[index]
+        );
+        context->stack_depth -= 8;
+    }
+
+    stack_padding = context->stack_depth % 16 != 0;
+    if (stack_padding) {
+        codegen_output_write(context->output, "    sub rsp, 8\n");
+        context->stack_depth += 8;
+    }
+
+    emit_assembly_template(context, NULL, instruction);
+    codegen_output_printf(
+        context->output,
+        ".section .text.%s,\"ax\",@progbits\n",
+        function->declaration->function.name
+    );
+
+    if (stack_padding) {
+        codegen_output_write(context->output, "    add rsp, 8\n");
+        context->stack_depth -= 8;
+    }
+
+    for (unsigned long index = instruction->output_count; index > 0; index--) {
+        codegen_output_printf(
+            context->output,
+            "    push %s\n",
+            instruction->output_constraints[index - 1] + 1
+        );
+        context->stack_depth += 8;
+    }
+    for (unsigned long index = 0;
+         index < instruction->output_count;
+         index++)
+    {
+        const ir_value *value = &function->values[
+            instruction->operand_values[index]
+        ];
+        unsigned long size = codegen_x86_64_context_type_size(
+            context,
+            value->type.name,
+            value->type.pointer_depth
+        );
+        codegen_output_write(context->output, "    pop rcx\n");
+        codegen_output_write(context->output, "    pop rax\n");
+        context->stack_depth -= 16;
+        codegen_output_printf(
+            context->output,
+            "    mov %s [rax], %s\n",
+            codegen_x86_64_type_operand_size(
+                value->type.name,
+                value->type.pointer_depth
+            ),
+            assembly_low_register(size)
+        );
     }
 
     while (saved_count > 0) {
@@ -1155,6 +1874,7 @@ codegen_x86_64_statement(
         return;
     }
 
+    codegen_x86_64_emit_location(context, statement);
 
     switch (statement->type){
 
@@ -1239,7 +1959,6 @@ codegen_x86_64_statement(
                     );
                 }
             }
-
 
             codegen_output_write(
                 context->output,
@@ -1406,6 +2125,10 @@ codegen_x86_64_statement(
 
             return;
 
+        case AST_MULTI_ASSIGNMENT:
+            emit_multi_assignment(context, statement);
+            return;
+
 
         /*
          * --------------------------------------------------------
@@ -1556,67 +2279,6 @@ codegen_x86_64_statement(
          * The expression result is left in rax.
          */
         case AST_RETURN:
-
-            codegen_output_write(
-                context->output,
-                "    # ------------------------------------------------------------\n"
-                "    # return\n"
-                "    # source: return"
-            );
-
-
-            if (statement->return_statement.value){
-
-                codegen_output_write(
-                    context->output,
-                    " '"
-                );
-
-
-                emit_expression_source(
-                    context,
-                    statement->return_statement.value
-                );
-
-
-                codegen_output_write(
-                    context->output,
-                    "'"
-                );
-            }
-
-
-            codegen_output_write(
-                context->output,
-                ";\n"
-                "    # ------------------------------------------------------------\n"
-            );
-
-
-            /*
-             * Generate the return value.
-             *
-             * The result remains in rax according to the
-             * System V AMD64 calling convention.
-             */
-            if (statement->return_statement.value){
-
-                codegen_x86_64_expression(
-                    context,
-                    statement->return_statement.value
-                );
-            }
-
-
-            codegen_output_printf(
-                context->output,
-                "\n"
-                "    # return\n"
-                "    # transfer control to function epilogue\n"
-                "    jmp .L%lu\n",
-                context->epilogue_label
-            );
-
             return;
 
         case AST_ASM:
@@ -1656,6 +2318,196 @@ codegen_x86_64_statement(
              * This should eventually be reported through
              * generic codegen error handling.
              */
+            return;
+    }
+}
+
+static void
+emit_ir_declaration(
+    codegen_x86_64_context *context,
+    const ir_function *function,
+    const ir_instruction *instruction
+)
+{
+    codegen_x86_64_local *local = codegen_x86_64_find_local(
+        context,
+        instruction->symbol_name
+    );
+    const ast *initializer = instruction->result_value == ULONG_MAX
+        ? NULL
+        : function->values[instruction->result_value].source;
+
+    codegen_x86_64_emit_location(context, instruction->source);
+    codegen_output_printf(
+        context->output,
+        "    # local variable: %s\n"
+        "    # type: %s",
+        instruction->symbol_name,
+        instruction->type.name
+    );
+    for (unsigned long index = 0;
+         index < instruction->type.pointer_depth;
+         index++)
+    {
+        codegen_output_write(context->output, " *");
+    }
+    codegen_output_write(context->output, "\n");
+
+    if (local) {
+        codegen_output_printf(
+            context->output,
+            "    # stack location: [rbp%+ld]\n",
+            local->offset
+        );
+    }
+
+    codegen_output_write(context->output, "    # source: ");
+    codegen_output_printf(
+        context->output,
+        "%s",
+        instruction->type.name
+    );
+    for (unsigned long index = 0;
+         index < instruction->type.pointer_depth;
+         index++)
+    {
+        codegen_output_write(context->output, " *");
+    }
+    codegen_output_printf(
+        context->output,
+        " %s",
+        instruction->symbol_name
+    );
+    if (initializer) {
+        codegen_output_write(context->output, " = ");
+        emit_expression_source(context, (ast *)initializer);
+    }
+    codegen_output_write(context->output, ";\n");
+
+    if (!initializer || !local) {
+        return;
+    }
+
+    if (
+        (local->array_count != 0 ||
+         (
+             local->pointer_depth == 0 &&
+             codegen_x86_64_type_size(local->type, 0) == 0
+         )) &&
+        codegen_x86_64_zero_initializer((ast *)initializer)
+    ) {
+        codegen_output_printf(
+            context->output,
+            "    lea rdi, [rbp%+ld]\n"
+            "    mov rcx, %lu\n"
+            "    xor eax, eax\n"
+            "    rep stosb\n",
+            local->offset,
+            local->size
+        );
+    } else {
+        codegen_x86_64_ir_expression_id(
+            context,
+            instruction->result_value
+        );
+        emit_local_store(context, local);
+    }
+}
+
+static void
+emit_ir_assignment(
+    codegen_x86_64_context *context,
+    const ir_function *function,
+    const ir_instruction *instruction
+)
+{
+    const ir_value *left = &function->values[instruction->left_value];
+    codegen_x86_64_local *local;
+    const char *operand_size;
+    const char *register_name;
+
+    codegen_x86_64_lvalue_address(context, (ast *)left->source);
+    codegen_output_write(context->output, "    push rax\n");
+    context->stack_depth += 8;
+
+    codegen_x86_64_ir_expression_id(
+        context,
+        instruction->right_value
+    );
+
+    codegen_output_write(context->output, "    pop rcx\n");
+    context->stack_depth -= 8;
+
+    if (left->opcode == IR_VALUE_LOAD) {
+        local = codegen_x86_64_find_local(context, left->name);
+        if (local) {
+            emit_local_store(context, local);
+            return;
+        }
+    }
+
+    operand_size = codegen_x86_64_type_operand_size(
+        instruction->type.name,
+        instruction->type.pointer_depth
+    );
+    register_name = codegen_x86_64_type_register(
+        instruction->type.name,
+        instruction->type.pointer_depth
+    );
+    if (operand_size && register_name) {
+        codegen_output_printf(
+            context->output,
+            "    mov %s [rcx], %s\n",
+            operand_size,
+            register_name
+        );
+    } else {
+        codegen_output_write(
+            context->output,
+            "    mov QWORD PTR [rcx], rax\n"
+        );
+    }
+}
+
+void
+codegen_x86_64_ir_statement(
+    codegen_x86_64_context *context,
+    const ir_function *function,
+    const ir_instruction *instruction
+)
+{
+    if (!context || !function || !instruction) {
+        return;
+    }
+
+    switch (instruction->opcode) {
+        case IR_INSTRUCTION_EXPRESSION:
+            if (instruction->result_value != ULONG_MAX) {
+                codegen_x86_64_ir_expression_id(
+                    context,
+                    instruction->result_value
+                );
+            }
+            return;
+
+        case IR_INSTRUCTION_ASSIGNMENT:
+            emit_ir_assignment(context, function, instruction);
+            return;
+
+        case IR_INSTRUCTION_DECLARATION:
+            emit_ir_declaration(context, function, instruction);
+            return;
+
+        case IR_INSTRUCTION_ASSEMBLY:
+            emit_ir_assembly(context, function, instruction);
+            return;
+
+        case IR_INSTRUCTION_MULTI_ASSIGNMENT:
+            emit_ir_multi_assignment(context, function, instruction);
+            return;
+
+        case IR_INSTRUCTION_RETURN:
+            emit_ir_return(context, function, instruction);
             return;
     }
 }

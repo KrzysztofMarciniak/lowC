@@ -39,6 +39,11 @@ flag_handler_is_optimize(
 );
 
 int
+flag_handler_is_debug(
+    const char *flag
+);
+
+int
 flag_handler_is_target(
     const char *flag
 );

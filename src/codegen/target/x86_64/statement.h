@@ -14,4 +14,11 @@ codegen_x86_64_statement(
     ast *statement
 );
 
+void
+codegen_x86_64_ir_statement(
+    codegen_x86_64_context *context,
+    const ir_function *function,
+    const ir_instruction *instruction
+);
+
 #endif

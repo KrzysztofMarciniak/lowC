@@ -69,6 +69,7 @@ typedef struct token
 
     unsigned long line;
     unsigned long column;
+    int imported;
 } token;
 
 typedef struct token_stream

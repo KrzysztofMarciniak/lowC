@@ -6,28 +6,30 @@ A small C-like systems language and compiler.
 
 lowC is a compact compiled language with a clean, C-inspired syntax. It provides explicit control over data representation and memory while keeping the language and compiler straightforward.
 
-lowC supports functions, structs, pointers, arrays, explicit byte-width integers, and direct control flow. The compiler produces explicit machine code and does not use an intermediate representation (IR).
+lowC supports functions, structs, pointers, arrays, explicit byte-width integers, and direct control flow. Its IR tracks typed expression values and control-flow basic blocks, selects referenced imported declarations, and performs constant folding before x86-64 code generation.
 
-The generated assembly prioritizes clarity and explicitness, with detailed commentary rather than aggressive optimization.
+The IR optimizer folds constant expressions. Release executables are linked
+with `-O3`, LTO, dead-section removal, and stripped symbols; these driver
+optimization flags also optimize any C sources compiled alongside lowC code.
 
 ## Build and Run
 
-Build the size-optimized release compiler with `make` or `make release`:
+Build the optimized release compiler with `make` or `make release`:
 
 ```sh
 make
 ```
 
-This builds `build/lowc` with size optimization, link-time optimization, dead
-section removal, and stripped symbols. Use `make debug` to build an
+This builds `build/lowc` with `-Os`, link-time optimization, dead section
+removal, and stripped symbols. Use `make debug` to build an
 unoptimized debug executable separately at `build/debug/lowc`.
 The release and portable builds omit compiler unwind tables to reduce their
 size; this can limit stack unwinding in debuggers and crash backtraces.
 `make install` always installs the release executable from `build/lowc`.
 Use `make portable` to build a statically linked Linux executable at
 `build/portable/lowc`; it remains specific to the current CPU architecture.
-On the x86-64 Alpine GCC 15.2/musl toolchain, these builds are about 53.7 KiB
-and 118.1 KiB respectively; exact sizes vary by toolchain and target.
+Release builds favor a smaller executable and remain portable across x86-64
+CPUs; no host-specific instruction set is enabled.
 
 New to lowC? Run `make quick_start` for a hand-holding introduction to the language, followed by compiling and running a small example. The guide is also available in [`QUICK_START.md`](QUICK_START.md).
 
@@ -64,10 +66,22 @@ build/lowc program.lowc
 ./a.out
 ```
 
-Use `-o` to choose the executable path, `-O1` to enable lightweight integer constant folding, or `--asm` to print assembly instead of building an executable:
+Normal executable builds optimize the compiler's IR by default. Use
+`-optimize` or its alias `-release` to explicitly request release linking:
+`-Os`, LTO, dead-section removal, and stripped symbols. The IR optimizer folds
+constant expressions, simplifies constant branches, propagates scalar constants
+through straight-line code, and precomputes simple pure multi-return calls
+with constant arguments. Each function gets its own linker section so unused
+code can be discarded. The system compiler's optimization flags also apply to
+C sources compiled alongside lowC.
+`-debug` emits source-mapped debug information, retains symbols, and disables
+optimization unless combined with `-optimize` or `-release`. There are no
+`-O0`/`-O1` levels.
+Use `-o` to choose the executable path, or `--asm` to print assembly:
 
 ```sh
-build/lowc -O1 -o program program.lowc
+build/lowc -optimize -o program program.lowc
+build/lowc -debug -o program program.lowc
 build/lowc --asm program.lowc
 ```
 
@@ -172,6 +186,18 @@ Comparisons return `u1`, an unsigned one-byte value.
 ||      // OR 
 ```
 
+Integer literals contain decimal digits and have type `s8`. Assignments allow
+conversion between integer types. Integer arithmetic produces `s8`; comparisons
+produce `u1`. The current x86-64 backend performs division, remainder, and
+ordered comparisons as signed operations, including for `u` operands. Unsigned
+division and ordering therefore do not yet have reliable unsigned semantics.
+Literal range, overflow, and division-by-zero behavior are not fully specified.
+
+`&&` and `||` short-circuit and require integer operands. `if` and `for`
+conditions currently do not require an integer type, and generated code tests
+the result against zero. Use integer conditions; behavior for non-integer
+conditions is not defined.
+
 ---
 
 ## Pointers
@@ -188,6 +214,11 @@ p = &x;
 ```
 
 Pointer arithmetic is automatically scaled by the size of the pointed-to type.
+Subtracting pointers of the same type produces a signed element distance.
+Pointer dereferences and array indexing have no runtime null or bounds checks;
+invalid memory access is the program's responsibility.
+The literal `0` is accepted when initializing a pointer; integer-to-pointer
+assignment is otherwise not allowed.
 
 ---
 
@@ -200,6 +231,10 @@ u8 values[10] = 0;
 
 values[0] = 42;
 ```
+
+Array lengths must be decimal integer literals; expressions and negative
+lengths are rejected. Zero is accepted. Indexing does not check that an index
+is within the array.
 
 ### Array-to-Pointer Conversion
 
@@ -252,6 +287,11 @@ p.x = 10;
 p.y = 20;
 ```
 
+On x86-64, fields are aligned to their type's size-based alignment (pointers
+are 8-byte aligned), and the struct size is rounded up to its maximum field
+alignment. This layout is target-specific and should not be assumed to match
+every C compiler's ABI.
+
 ### Pointer Access
 
 ```c
@@ -288,6 +328,32 @@ s8 add(s8 a, s8 b) {
 }
 ```
 
+### Multiple Return Values
+
+Functions can declare multiple return types and return a matching list of
+expressions. Call them with tuple destructuring assignment:
+
+```c
+s8, s8 divide(s8 numerator, s8 denominator) {
+    return numerator / denominator, numerator % denominator;
+}
+
+void entrypoint(void) {
+    s8 quotient = 0;
+    s8 remainder = 0;
+
+    (quotient, remainder) = divide(37, 5);
+}
+```
+
+Return values and assignment targets are matched by position, and their count
+and types are checked. A multi-return call must be used directly in tuple
+assignment; tuples are not standalone values. `void` can only be used as the
+single return type. `foreign c` functions continue to have exactly one return
+type and use the C ABI. Multi-return calls between lowC functions use an
+internal caller-provided result buffer and are not directly callable through
+the C ABI.
+
 ### Void Functions
 
 Functions that take no parameters must declare `void` in the parameter list.
@@ -303,6 +369,15 @@ void foo(void) {
 Functions may call other functions.
 
 **Function overloading is not supported.**
+
+Function parameters and local variables share one function scope; braces do not
+create nested scopes, so a name cannot be redeclared in another block of the
+same function. Calls evaluate arguments from right to left. The current lowC
+backend supports at most six parameters per function.
+
+The checker validates each return statement but does not prove that every
+control-flow path in a non-void function returns a value. Ensure every path
+returns explicitly.
 
 ### Entrypoint
 
@@ -355,6 +430,8 @@ Prebuilt libraries can still be linked with `-L<path>` and `-l<name>`. Use
 Foreign declarations currently support the x86-64 System V C ABI, fixed
 integer and pointer arguments/results, and up to six parameters. Structs passed
 or returned by value and automatic C-header parsing are not supported.
+Generated programs currently target Linux on x86-64; the lowC function ABI,
+including multi-return result buffers, is internal and is not a C ABI.
 
 ---
 
@@ -383,6 +460,9 @@ for (init; condition; increment) {
     ...
 }
 ```
+
+The language currently has no `while`, `switch`, `break`, or `continue`
+statements.
 
 ### Return Statements
 
@@ -444,6 +524,11 @@ Only the names listed by an import are visible to that source file. Declarations
 in a module remain available within that module, but imports are not re-exported;
 import a dependency directly to use its names from another file.
 
+Imported files are parsed and checked in full, but unused imported functions,
+globals, and structs are omitted from generated code. Imported declarations
+referenced by root-source declarations, and their required dependencies, are
+retained. All declarations in explicitly supplied root source files are kept.
+
 ## Standard library
 
 `make install` also installs public standard-library modules beneath
@@ -498,6 +583,10 @@ public `print` function calculates their length with the public `strlen`
 helper, so output stops at the first NUL byte. `print` writes to standard
 output via the Linux x86-64 `write` syscall; it has no error return in this
 initial API.
+
+The recognized string escapes are `\n`, `\r`, `\t`, `\\`, and `\"`. An
+unrecognized backslash escape currently emits the escaped character without
+the backslash.
 
 `print_u1`, `print_u2`, `print_u4`, and `print_u8` print unsigned integers in
 decimal. `print_s1`, `print_s2`, `print_s4`, and `print_s8` do the same for
@@ -611,8 +700,8 @@ SeparateDefinitionBlocks: Always
 UseTab: Never
 ```
 
-Formatting cannot be combined with `--tokens`, `--ast`, `--asm`, `-O1`, or
-`-o`.
+Formatting cannot be combined with `--tokens`, `--ast`, `--asm`, `-debug`,
+`-optimize`, `-release`, or `-o`.
 
 ## Inline assembly
 
@@ -633,7 +722,8 @@ list names registers the template modifies; `"memory"` declares memory
 effects and `"cc"` declares condition-code effects. Output registers are
 already treated as modified. Use `%%` for a
 literal percent sign, and write empty sections explicitly (for example,
-`asm("nop" : : :);`). The compiler preserves
+`asm("nop" : : :);`). Adjacent string literals in the assembly template are
+concatenated. The compiler preserves
 callee-saved registers named as operands or clobbers. `rsp` and `rbp` are
 reserved and cannot be operands or clobbers; templates must not modify them.
 Other code-generation targets reject inline assembly.

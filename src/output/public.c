@@ -53,6 +53,8 @@ output_build_executable(
     size_t argument_index;
     size_t argument_count;
     size_t c_source_argument_count;
+    size_t optimization_argument_count;
+    size_t strip_argument_count;
     size_t remaining;
     const char *cursor;
     int descriptor;
@@ -101,8 +103,14 @@ output_build_executable(
         input_files->c_source_count == 0
             ? 0
             : 2 + (size_t)input_files->c_source_count;
+    optimization_argument_count = options->optimize ? 5 : 0;
+    strip_argument_count =
+        options->optimize && !options->debug ? 1 : 0;
     argument_count =
         7 +
+        (options->debug ? 1 : 0) +
+        optimization_argument_count +
+        strip_argument_count +
         (size_t)options->linker_argument_count +
         c_source_argument_count;
     compiler_arguments = calloc(
@@ -121,6 +129,20 @@ output_build_executable(
     compiler_arguments[4] = "-o";
     compiler_arguments[5] = (char *)output_path;
     argument_index = 6;
+    if (options->optimize) {
+        compiler_arguments[argument_index++] = "-Os";
+        compiler_arguments[argument_index++] = "-flto";
+        compiler_arguments[argument_index++] = "-ffunction-sections";
+        compiler_arguments[argument_index++] = "-fdata-sections";
+        compiler_arguments[argument_index++] = "-Wl,--gc-sections";
+    }
+    if (options->debug) {
+        compiler_arguments[argument_index++] = "-g";
+    }
+    if (options->optimize && !options->debug) {
+        compiler_arguments[argument_index++] = "-s";
+    }
+
     if (input_files->c_source_count > 0) {
         compiler_arguments[argument_index++] = "-x";
         compiler_arguments[argument_index++] = "c";

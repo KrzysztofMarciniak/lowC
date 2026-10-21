@@ -9,7 +9,8 @@ typedef struct semantic_function
 {
     char *name;
 
-    semantic_type *return_type;
+    semantic_type **return_types;
+    unsigned long return_type_count;
 
     semantic_type **parameter_types;
     unsigned long parameter_count;

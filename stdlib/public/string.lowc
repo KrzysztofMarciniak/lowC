@@ -1,143 +1,135 @@
 #include "../internal/string/main.lowc" : "__lowc_strlen";
 #include "memory.lowc" : "alloc";
 
-u8 strlen(u1 *data) {
-    return __lowc_strlen(data);
-}
+u8 strlen(u1* data) { return __lowc_strlen(data); }
 
-u1 parse_u8(u1 *text, u8 *result) {
-    u1 *maximum = 0;
-    u8 length = 0;
-    u8 first_significant = 0;
-    u8 significant_length = 0;
-    u8 index = 0;
-    u8 parsed = 0;
-    s8 comparison = 0;
+u1 parse_u8(u1* text, u8* result) {
+        u1* maximum           = 0;
+        u8 length             = 0;
+        u8 first_significant  = 0;
+        u8 significant_length = 0;
+        u8 index              = 0;
+        u8 parsed             = 0;
+        s8 comparison         = 0;
 
-    maximum = "18446744073709551615";
-    length = 0;
+        maximum = "18446744073709551615";
+        length  = 0;
 
-    for (; text[length] != 0; length = length + 1) {
-        if (text[length] < 48 || text[length] > 57) {
-            return 0;
+        for (; text[length] != 0; length = length + 1) {
+                if (text[length] < 48 || text[length] > 57) {
+                        return 0;
+                }
         }
-    }
 
-    if (length == 0) {
-        return 0;
-    }
+        if (length == 0) {
+                return 0;
+        }
 
-    first_significant = 0;
-    for (
-        ;
-        first_significant < length && text[first_significant] == 48;
-        first_significant = first_significant + 1
-    ) {
-    }
+        first_significant = 0;
+        for (; first_significant < length && text[first_significant] == 48;
+             first_significant = first_significant + 1) {
+        }
 
-    significant_length = length - first_significant;
-    if (significant_length > 20) {
-        return 0;
-    }
+        significant_length = length - first_significant;
+        if (significant_length > 20) {
+                return 0;
+        }
 
-    if (significant_length == 20) {
-        comparison = 0;
+        if (significant_length == 20) {
+                comparison = 0;
 
-        for (index = 0; index < 20; index = index + 1) {
-            if (comparison == 0) {
-                if (text[first_significant + index] > maximum[index]) {
-                    comparison = 1;
+                for (index = 0; index < 20; index = index + 1) {
+                        if (comparison == 0) {
+                                if (text[first_significant + index] >
+                                    maximum[index]) {
+                                        comparison = 1;
+                                }
+
+                                if (text[first_significant + index] <
+                                    maximum[index]) {
+                                        comparison = -1;
+                                }
+                        }
                 }
 
-                if (text[first_significant + index] < maximum[index]) {
-                    comparison = -1;
+                if (comparison > 0) {
+                        return 0;
                 }
-            }
         }
 
-        if (comparison > 0) {
-            return 0;
+        parsed = 0;
+        for (index = 0; index < length; index = index + 1) {
+                parsed = parsed * 10 + (text[index] - 48);
         }
-    }
 
-    parsed = 0;
-    for (index = 0; index < length; index = index + 1) {
-        parsed = parsed * 10 + (text[index] - 48);
-    }
-
-    *result = parsed;
-    return 1;
-}
-
-s8 strcmp(u1 *left, u1 *right) {
-    u8 index = 0;
-
-    for (
-        index = 0;
-        left[index] == right[index] && left[index] != 0;
-        index = index + 1
-    ) {
-    }
-
-    if (left[index] < right[index]) {
-        return -1;
-    }
-
-    if (left[index] > right[index]) {
+        *result = parsed;
         return 1;
-    }
-
-    return 0;
 }
 
-u1 *strcpy(u1 *destination, u1 *source) {
-    u1 *result = 0;
-    u8 index = 0;
+s8 strcmp(u1* left, u1* right) {
+        u8 index = 0;
 
-    result = destination;
+        for (index = 0; left[index] == right[index] && left[index] != 0;
+             index = index + 1) {
+        }
 
-    for (index = 0; source[index] != 0; index = index + 1) {
-        destination[index] = source[index];
-    }
+        if (left[index] < right[index]) {
+                return -1;
+        }
 
-    destination[index] = 0;
-    return result;
+        if (left[index] > right[index]) {
+                return 1;
+        }
+
+        return 0;
 }
 
-u1 *strcat(u1 *destination, u1 *source) {
-    u1 *result = 0;
-    u8 destination_length = 0;
-    u8 source_index = 0;
+u1* strcpy(u1* destination, u1* source) {
+        u1* result = 0;
+        u8 index   = 0;
 
-    result = destination;
+        result = destination;
 
-    for (
-        destination_length = 0;
-        destination[destination_length] != 0;
-        destination_length = destination_length + 1
-    ) {
-    }
+        for (index = 0; source[index] != 0; index = index + 1) {
+                destination[index] = source[index];
+        }
 
-    for (source_index = 0; source[source_index] != 0; source_index = source_index + 1) {
-        destination[destination_length + source_index] =
-            source[source_index];
-    }
-
-    destination[destination_length + source_index] = 0;
-    return result;
+        destination[index] = 0;
+        return result;
 }
 
-u1 *strdup(u1 *source) {
-    u1 *result = 0;
-    u8 length = 0;
-    u8 index = 0;
+u1* strcat(u1* destination, u1* source) {
+        u1* result            = 0;
+        u8 destination_length = 0;
+        u8 source_index       = 0;
 
-    length = strlen(source);
-    result = alloc(length + 1);
+        result = destination;
 
-    for (index = 0; index <= length; index = index + 1) {
-        result[index] = source[index];
-    }
+        for (destination_length = 0; destination[destination_length] != 0;
+             destination_length = destination_length + 1) {
+        }
 
-    return result;
+        for (source_index = 0; source[source_index] != 0;
+             source_index = source_index + 1) {
+                destination[destination_length + source_index] =
+                    source[source_index];
+        }
+
+        destination[destination_length + source_index] = 0;
+        return result;
+}
+
+u1* strdup(u1* source) {
+        u1* result = 0;
+        u8 length  = 0;
+        u8 index   = 0;
+
+        length = strlen(source);
+        result = alloc(length + 1);
+
+        for (index = 0; index <= length; index = index + 1) {
+                result[index] = source[index];
+        }
+
+        return result;
 }

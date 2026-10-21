@@ -8,6 +8,7 @@
 typedef struct codegen_context
 {
     codegen_result *result;
+    ir_module *module;
 
     codegen_output output;
 
@@ -15,10 +16,13 @@ typedef struct codegen_context
 
     unsigned long label_counter;
     int optimize;
+    int debug;
     int executable;
     ast_list *structs;
     ast_list *globals;
     ast_list *functions;
+    const char **debug_files;
+    unsigned long debug_file_count;
 
 } codegen_context;
 
@@ -40,6 +44,11 @@ char *codegen_make_label(
 void codegen_fail(
     codegen_context *context,
     const char *message
+);
+
+unsigned long codegen_debug_file_id(
+    codegen_context *context,
+    const char *path
 );
 
 #endif

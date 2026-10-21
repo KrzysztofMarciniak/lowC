@@ -298,6 +298,13 @@ files_handler(
                 };
             }
 
+            for (int expanded_index = 0;
+                 expanded_index < expanded_count;
+                 expanded_index++)
+            {
+                expanded[expanded_index].imported = 1;
+            }
+
             result = files_handler_append(
                 &values,
                 &count,

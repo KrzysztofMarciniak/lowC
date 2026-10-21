@@ -1,0 +1,62 @@
+struct Pair {
+    s8 first;
+    s8 second;
+};
+
+u1 pointed_value = 42;
+u8 multiple_return_result = 0;
+
+u1, u1, u1 increment(u1 left, u1 right) {
+    return left + 1, right + 1, left + right + 2;
+}
+
+u1 *, u1 echo_pointer_and_value(u1 *pointer, u1 value) {
+    return pointer, value;
+}
+
+u1, s1 narrow_values(void) {
+    return 255, -1;
+}
+
+struct Pair, u1 * make_pair_and_pointer(void) {
+    struct Pair pair = 0;
+    pair.first = 17;
+    pair.second = 25;
+    return pair, &pointed_value;
+}
+
+void entrypoint(void) {
+    u1 left = 0;
+    u1 right = 0;
+    u1 total = 0;
+    u1 *echoed_pointer = 0;
+    u1 *pointer = 0;
+    u1 value = 0;
+    u1 byte_value = 0;
+    s8 signed_value = 0;
+    struct Pair pair = 0;
+
+    (left, right, total) = increment(10, 20);
+    (echoed_pointer, value) = echo_pointer_and_value(&pointed_value, 9);
+    (byte_value, signed_value) = narrow_values();
+    (pair, pointer) = make_pair_and_pointer();
+
+    if (
+        left == 11 &&
+        right == 21 &&
+        total == 32 &&
+        *echoed_pointer == 42 &&
+        *pointer == 42 &&
+        value == 9 &&
+        byte_value == 255 &&
+        signed_value == -1 &&
+        pair.first == 17 &&
+        pair.second == 25
+    ) {
+        multiple_return_result = 1;
+    } else {
+        multiple_return_result = 0;
+    }
+
+    return;
+}
