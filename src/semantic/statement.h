@@ -16,4 +16,14 @@ semantic_check_statement(
     char **error_text
 );
 
+/**
+ * @brief Check whether a statement guarantees an explicit return.
+ *
+ * @return Nonzero if every normal path through the statement returns.
+ */
+int
+semantic_statement_always_returns(
+    const ast *statement
+);
+
 #endif

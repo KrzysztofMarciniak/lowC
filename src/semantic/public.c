@@ -194,6 +194,19 @@ semantic_check_function(
     )
         goto fail;
 
+    if (
+        !semantic_statement_always_returns(
+            function->function.body
+        )
+    )
+    {
+        *error_text = semantic_strdup(
+            "function can reach its end without an explicit return"
+        );
+
+        goto fail;
+    }
+
     semantic_scope_free(context->scope);
 
     context->scope = previous_scope;

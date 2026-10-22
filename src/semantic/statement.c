@@ -4,6 +4,49 @@
 #include <stdio.h>
 #include <string.h>
 
+int
+semantic_statement_always_returns(
+    const ast *statement
+)
+{
+    unsigned long i;
+
+    if (statement == NULL)
+        return 0;
+
+    switch (statement->type)
+    {
+        case AST_RETURN:
+            return 1;
+
+        case AST_BLOCK:
+            for (i = 0; i < statement->block.statements.count; i++)
+            {
+                if (
+                    semantic_statement_always_returns(
+                        statement->block.statements.values[i]
+                    )
+                )
+                    return 1;
+            }
+
+            return 0;
+
+        case AST_IF:
+            return
+                statement->if_statement.else_body != NULL &&
+                semantic_statement_always_returns(
+                    statement->if_statement.then_body
+                ) &&
+                semantic_statement_always_returns(
+                    statement->if_statement.else_body
+                );
+
+        default:
+            return 0;
+    }
+}
+
 
 static char *
 semantic_strdup(

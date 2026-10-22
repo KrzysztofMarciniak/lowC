@@ -54,6 +54,7 @@ void hashmap_place(struct HashMap* map, u8 key, u8 value) {
         map->keys[index]   = key;
         map->values[index] = value;
         map->states[index] = 1;
+        return;
 }
 
 void hashmap_resize(struct HashMap* map, u8 capacity) {
@@ -87,6 +88,7 @@ void hashmap_resize(struct HashMap* map, u8 capacity) {
         dealloc(old_keys);
         dealloc(old_values);
         dealloc(old_states);
+        return;
 }
 
 void hashmap_init(struct HashMap* map, u8 capacity) {
@@ -105,6 +107,7 @@ void hashmap_init(struct HashMap* map, u8 capacity) {
         for (index = 0; index < capacity; index = index + 1) {
                 map->states[index] = 0;
         }
+        return;
 }
 
 void hashmap_set(struct HashMap* map, u8 key, u8 value) {
@@ -113,6 +116,7 @@ void hashmap_set(struct HashMap* map, u8 key, u8 value) {
         }
 
         hashmap_place(map, key, value);
+        return;
 }
 
 u1 hashmap_get(struct HashMap* map, u8 key, u8* value) {

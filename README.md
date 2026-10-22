@@ -346,6 +346,7 @@ void entrypoint(void) {
     s8 remainder = 0;
 
     (quotient, remainder) = divide(37, 5);
+    return;
 }
 ```
 
@@ -378,9 +379,11 @@ create nested scopes, so a name cannot be redeclared in another block of the
 same function. Calls evaluate arguments from right to left. The current lowC
 backend supports at most six parameters per function.
 
-The checker validates each return statement but does not prove that every
-control-flow path in a non-void function returns a value. Ensure every path
-returns explicitly.
+Every normal control-flow path in a lowC function definition must end in an
+explicit `return`. This includes `return;` in `void` functions. An `if`
+statement only guarantees a return when both branches do; loops are
+conservatively treated as able to fall through. Foreign function declarations
+have no body and are not subject to this rule.
 
 ### Entrypoint
 
@@ -391,6 +394,7 @@ Every executable program must define exactly one `entrypoint` function.
 ```c
 void entrypoint(void) {
     // Program execution begins here.
+    return;
 }
 ```
 
@@ -514,6 +518,7 @@ s8 sqrt(s8 x) {
 
 void entrypoint(void) {
     s8 result = add(10, 20);
+    return;
 }
 ```
 
@@ -544,6 +549,7 @@ output on Linux x86-64:
 
 void entrypoint(void) {
     print("Hello, World\n");
+    return;
 }
 ```
 
@@ -571,6 +577,7 @@ void entrypoint(void) {
             print("\n");
         }
     }
+    return;
 }
 ```
 
@@ -603,6 +610,7 @@ void entrypoint(void) {
     print_u8(42);
     print_s8(-7);
     print("\n");
+    return;
 }
 ```
 

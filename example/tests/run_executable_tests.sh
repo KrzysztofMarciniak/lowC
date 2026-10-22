@@ -757,6 +757,81 @@ for mode in unoptimized optimized; do
     fi
 done
 
+cat >"$TEMP_DIR/explicit-returns-valid.lowc" <<'EOF'
+u8 choose(u1 condition) {
+    if (condition) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+void do_nothing(void) {
+    return;
+}
+
+void entrypoint(void) {
+    do_nothing();
+    return;
+}
+EOF
+
+if ! "$BIN" "$TEMP_DIR/explicit-returns-valid.lowc" \
+    -o "$TEMP_DIR/explicit-returns-valid" ||
+   ! "$TEMP_DIR/explicit-returns-valid"
+then
+    echo "FAIL [returns] rejected valid explicit returns"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/explicit-returns-missing-void.lowc" <<'EOF'
+void missing_return(void) {
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/explicit-returns-missing-void.lowc" \
+    >"$TEMP_DIR/explicit-returns-missing-void.out" 2>&1 ||
+   ! grep -q "without an explicit return" \
+       "$TEMP_DIR/explicit-returns-missing-void.out"
+then
+    echo "FAIL [returns] accepted a void function without return;"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/explicit-returns-missing-branch.lowc" <<'EOF'
+u8 missing_return(u1 condition) {
+    if (condition) {
+        return 1;
+    }
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/explicit-returns-missing-branch.lowc" \
+    >"$TEMP_DIR/explicit-returns-missing-branch.out" 2>&1 ||
+   ! grep -q "without an explicit return" \
+       "$TEMP_DIR/explicit-returns-missing-branch.out"
+then
+    echo "FAIL [returns] accepted a value function with a fallthrough branch"
+    exit 1
+fi
+
+cat >"$TEMP_DIR/explicit-returns-loop.lowc" <<'EOF'
+u8 maybe_return(u1 condition) {
+    for (; condition;) {
+        return 1;
+    }
+}
+EOF
+
+if "$BIN" --asm "$TEMP_DIR/explicit-returns-loop.lowc" \
+    >"$TEMP_DIR/explicit-returns-loop.out" 2>&1 ||
+   ! grep -q "without an explicit return" \
+       "$TEMP_DIR/explicit-returns-loop.out"
+then
+    echo "FAIL [returns] treated a possibly skipped loop as an explicit return"
+    exit 1
+fi
+
 cat >"$TEMP_DIR/multiple-return-count.lowc" <<'EOF'
 u1, u1 pair(void) {
     return 1;
@@ -856,6 +931,7 @@ cat >"$TEMP_DIR/standard-library-print.lowc" <<EOF
 void entrypoint(void) {
     u8 length = strlen("Hello, World\\n");
     print("Hello, World\\n");
+    return;
 }
 EOF
 
@@ -1171,6 +1247,7 @@ void entrypoint(void) {
     }
     print(argument);
     print("\\n");
+    return;
 }
 EOF
 

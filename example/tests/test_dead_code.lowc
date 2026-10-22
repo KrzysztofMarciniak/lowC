@@ -2,10 +2,12 @@ u1 dead_code_result = 0;
 
 void dead_effect(void) {
     dead_code_result = 99;
+    return;
 }
 
 void live_effect(void) {
     dead_code_result = dead_code_result + 1;
+    return;
 }
 
 void entrypoint(void) {
