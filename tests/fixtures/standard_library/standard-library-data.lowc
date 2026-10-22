@@ -10,6 +10,7 @@ u8 standard_library_data_test(void) {
     u1 *buffer = 0;
     u1 *copy = 0;
     struct HashMap map = 0;
+    u1 found = 0;
     u8 value = 0;
     u8 high_key = 0;
     u8 index = 0;
@@ -33,24 +34,32 @@ u8 standard_library_data_test(void) {
 
     asm("mov %0, 0x8000000000000000" : "=rax"(high_key) : :);
     hashmap_set(&map, high_key, 99);
-    if (hashmap_get(&map, high_key, &value) == 0 || value != 99) {
+    (found, value) = hashmap_get(&map, high_key);
+    if (found == 0 || value != 99) {
         return 3;
     }
 
-    if (hashmap_get(&map, 8, &value) == 0 || value != 56) {
+    (found, value) = hashmap_get(&map, 8);
+    if (found == 0 || value != 56) {
         return 4;
     }
 
-    if (hashmap_remove(&map, 8) == 0 || hashmap_get(&map, 8, &value) != 0) {
+    if (hashmap_remove(&map, 8) == 0) {
+        return 5;
+    }
+    (found, value) = hashmap_get(&map, 8);
+    if (found != 0 || value != 0) {
         return 5;
     }
 
     hashmap_set(&map, 24, 168);
-    if (hashmap_get(&map, 24, &value) == 0 || value != 168) {
+    (found, value) = hashmap_get(&map, 24);
+    if (found == 0 || value != 168) {
         return 6;
     }
 
-    if (hashmap_get(&map, 9, &value) == 0 || value != 63) {
+    (found, value) = hashmap_get(&map, 9);
+    if (found == 0 || value != 63) {
         return 7;
     }
 

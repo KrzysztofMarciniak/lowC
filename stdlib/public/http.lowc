@@ -2,11 +2,6 @@
     "TcpConnection", "tcp_connect", "tcp_send", "tcp_receive", "tcp_close";
 #include "string.lowc" : "strlen";
 
-struct HttpResponse {
-    s4 status_code;
-    u8 body_length;
-};
-
 u1 __lowc_http_valid_field(u1 *value) {
     u8 index = 0;
 
@@ -66,13 +61,12 @@ s8 __lowc_http_send_all(
     return 0;
 }
 
-s8 http_get(
+s8, s4 http_get(
     u1 *host,
     u8 port,
     u1 *path,
     u1 *body,
-    u8 body_capacity,
-    struct HttpResponse *response
+    u8 body_capacity
 ) {
     struct TcpConnection connection = 0;
     u1 chunk[1024] = 0;
@@ -89,20 +83,17 @@ s8 http_get(
     s4 status_code = 0;
     s8 result = 0;
 
-    response->status_code = 0;
-    response->body_length = 0;
-
     if (
         __lowc_http_valid_field(host) == 0 ||
         __lowc_http_valid_field(path) == 0 ||
         path[0] != 47
     ) {
-        return -20003;
+        return -20003, 0;
     }
 
     result = tcp_connect(host, port, &connection);
     if (result != 0) {
-        return result;
+        return result, 0;
     }
 
     result = __lowc_http_send_all(&connection, "GET ", 4);
@@ -128,25 +119,25 @@ s8 http_get(
     }
     if (result != 0) {
         tcp_close(&connection);
-        return result;
+        return result, 0;
     }
 
     for (; header_complete == 0;) {
         received = tcp_receive(&connection, &chunk[0], 1024);
         if (received < 0) {
             tcp_close(&connection);
-            return received;
+            return received, 0;
         }
         if (received == 0) {
             tcp_close(&connection);
-            return -20001;
+            return -20001, 0;
         }
 
         for (index = 0; index < received && header_complete == 0;
              index = index + 1) {
             if (header_length == 4096) {
                 tcp_close(&connection);
-                return -20001;
+                return -20001, 0;
             }
 
             headers[header_length] = chunk[index];
@@ -163,7 +154,7 @@ s8 http_get(
                 for (; index < received; index = index + 1) {
                     if (body_length == body_capacity) {
                         tcp_close(&connection);
-                        return -20002;
+                        return -20002, 0;
                     }
                     body[body_length] = chunk[index];
                     body_length = body_length + 1;
@@ -174,7 +165,7 @@ s8 http_get(
 
     if (__lowc_http_has_chunked(&headers[0], header_length)) {
         tcp_close(&connection);
-        return -20005;
+        return -20005, 0;
     }
 
     for (index = 0; index < header_length && headers[index] != 32;
@@ -182,7 +173,7 @@ s8 http_get(
     }
     if (index == header_length || index + 3 >= header_length) {
         tcp_close(&connection);
-        return -20001;
+        return -20001, 0;
     }
 
     status_index = index + 1;
@@ -197,21 +188,20 @@ s8 http_get(
     }
     if (status_found == 0) {
         tcp_close(&connection);
-        return -20001;
+        return -20001, 0;
     }
-    response->status_code = status_code;
 
     received = -1;
     for (; received != 0;) {
         received = tcp_receive(&connection, &chunk[0], 1024);
         if (received < 0) {
             tcp_close(&connection);
-            return received;
+            return received, 0;
         }
         if (received != 0) {
             if (received > body_capacity - body_length) {
                 tcp_close(&connection);
-                return -20002;
+                return -20002, 0;
             }
 
             for (index = 0; index < received; index = index + 1) {
@@ -223,9 +213,8 @@ s8 http_get(
 
     result = tcp_close(&connection);
     if (result != 0) {
-        return result;
+        return result, 0;
     }
 
-    response->body_length = body_length;
-    return body_length;
+    return body_length, status_code;
 }

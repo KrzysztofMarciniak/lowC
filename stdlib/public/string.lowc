@@ -3,7 +3,7 @@
 
 u8 strlen(u1* data) { return __lowc_strlen(data); }
 
-u1 parse_u8(u1* text, u8* result) {
+u1, u8 parse_u8(u1* text) {
         u1* maximum           = 0;
         u8 length             = 0;
         u8 first_significant  = 0;
@@ -17,12 +17,12 @@ u1 parse_u8(u1* text, u8* result) {
 
         for (; text[length] != 0; length = length + 1) {
                 if (text[length] < 48 || text[length] > 57) {
-                        return 0;
+                        return 0, 0;
                 }
         }
 
         if (length == 0) {
-                return 0;
+                return 0, 0;
         }
 
         first_significant = 0;
@@ -32,7 +32,7 @@ u1 parse_u8(u1* text, u8* result) {
 
         significant_length = length - first_significant;
         if (significant_length > 20) {
-                return 0;
+                return 0, 0;
         }
 
         if (significant_length == 20) {
@@ -53,7 +53,7 @@ u1 parse_u8(u1* text, u8* result) {
                 }
 
                 if (comparison > 0) {
-                        return 0;
+                        return 0, 0;
                 }
         }
 
@@ -62,8 +62,7 @@ u1 parse_u8(u1* text, u8* result) {
                 parsed = parsed * 10 + (text[index] - 48);
         }
 
-        *result = parsed;
-        return 1;
+        return 1, parsed;
 }
 
 s8 strcmp(u1* left, u1* right) {

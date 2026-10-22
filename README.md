@@ -678,13 +678,15 @@ void entrypoint(void) {
     u8 count = args_count();
     u8 index = 0;
     u1 *argument = 0;
+    u1 found = 0;
 
     print("args count = ");
     print_u8(count);
     print("\n");
 
     for (index = 0; index < count; index = index + 1) {
-        if (args_get(index, &argument)) {
+        (found, argument) = args_get(index);
+        if (found) {
             print(argument);
             print("\n");
         }
@@ -693,12 +695,11 @@ void entrypoint(void) {
 }
 ```
 
-`args_count()` includes the executable path, so `args_get(0, &argument)`
-retrieves `argv[0]`; subsequent indices are the arguments in order.
-`args_get` returns false for an out-of-range index and leaves the output
-pointer unchanged. Returned strings are borrowed, NUL-terminated process
-arguments: do not modify or deallocate them. The startup bridge currently
-supports Linux x86-64.
+`args_count()` includes the executable path, so `args_get(0)` returns
+`(true, argv[0])`; subsequent indices are the arguments in order.
+`args_get(index)` returns `(false, 0)` for an out-of-range index. Returned
+strings are borrowed, NUL-terminated process arguments: do not modify or
+deallocate them. The startup bridge currently supports Linux x86-64.
 
 String literals evaluate to `u1 *` and are stored as read-only byte data. The
 public `print` function calculates their length with the public `strlen`
@@ -741,10 +742,16 @@ u8 string_example(void) {
 }
 ```
 
-`parse_u8(text, &value)` returns true for a non-empty sequence of decimal
-digits that fits in `u8`, and writes the parsed value only on success. It
-accepts leading zeroes but rejects signs, whitespace, other characters, and
-overflow.
+`parse_u8(text)` returns `(success, value)`. `success` is true for a non-empty
+sequence of decimal digits that fits in `u8`; on failure it returns `(false,
+0)`. It accepts leading zeroes but rejects signs, whitespace, other characters,
+and overflow. Destructure the result with tuple assignment:
+
+```c
+u1 parsed = 0;
+u8 value = 0;
+(parsed, value) = parse_u8("42");
+```
 
 `strcmp` returns a negative value, zero, or a positive value for less-than,
 equal, or greater-than strings. `strcpy` and `strcat` return the destination;
@@ -770,8 +777,8 @@ whether the underlying unmap succeeded; only pass it pointers returned by
 The `hashmap.lowc` module provides an open-addressed `u8`-to-`u8` map with
 linear probing and automatic growth. Import `HashMap`, `hashmap_init`,
 `hashmap_set`, `hashmap_get`, `hashmap_remove`, and `hashmap_deinit`. Initialize
-the struct before use; `hashmap_get` writes into its output pointer and returns
-whether the key existed:
+the struct before use; `hashmap_get` returns `(found, value)`, with `(false, 0)`
+when the key does not exist:
 
 ```c
 #include "/usr/local/share/lowc/public/hashmap.lowc" :
@@ -780,11 +787,13 @@ whether the key existed:
 
 u1 hashmap_example(void) {
     struct HashMap map = 0;
+    u1 found = 0;
     u8 value = 0;
 
     hashmap_init(&map, 8);
     hashmap_set(&map, 42, 100);
-    if (!hashmap_get(&map, 42, &value) || value != 100) {
+    (found, value) = hashmap_get(&map, 42);
+    if (!found || value != 100) {
         hashmap_deinit(&map);
         return 0;
     }
@@ -857,26 +866,26 @@ The `http.lowc` module performs a basic plain-HTTP GET and writes the body to a
 caller-provided buffer:
 
 ```c
-#include "/usr/local/share/lowc/public/http.lowc" :
-    "HttpResponse", "http_get";
+#include "/usr/local/share/lowc/public/http.lowc" : "http_get";
 
 s8 http_example(void) {
-    struct HttpResponse response = 0;
     u1 body[1024] = 0;
-    s8 body_length = http_get(
-        "example.com", 80, "/", body, 1023, &response
+    s8 body_length = 0;
+    s4 status_code = 0;
+    (body_length, status_code) = http_get(
+        "example.com", 80, "/", body, 1023
     );
     if (body_length < 0) {
         return body_length;
     }
 
     body[body_length] = 0;
-    return response.status_code;
+    return status_code;
 }
 ```
 
-On success `http_get` returns the body length and fills `HttpResponse` with the
-HTTP status and body length. Errors are negative: `-20001` for malformed or
+On success `http_get` returns `(body_length, status_code)`. On error the first
+value is negative and the status code is zero: `-20001` for malformed or
 incomplete headers, `-20002` when the body does not fit, `-20003` for an
 invalid host/path, `-20004` for a zero-byte request send, and `-20005` for
 chunked responses (which are not decoded). Network errors are propagated.

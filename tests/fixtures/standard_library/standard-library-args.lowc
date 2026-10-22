@@ -6,37 +6,42 @@
 void entrypoint(void) {
     u8 count = 0;
     u1 *argument = 0;
+    u1 found = 0;
 
     count = args_count();
     print_u8(count);
     print("|");
 
-    if (args_get(0, &argument)) {
+    (found, argument) = args_get(0);
+    if (found) {
         print(argument);
     } else {
         print("missing");
     }
     print("|");
 
-    if (args_get(1, &argument)) {
+    (found, argument) = args_get(1);
+    if (found) {
         print(argument);
     } else {
         print("missing");
     }
     print("|");
 
-    if (args_get(2, &argument)) {
+    (found, argument) = args_get(2);
+    if (found) {
         print(argument);
     } else {
         print("missing");
     }
     print("|");
 
-    argument = "unchanged";
-    if (args_get(count, &argument)) {
+    (found, argument) = args_get(count);
+    if (found) {
         print("unexpected");
+    } else {
+        print("missing");
     }
-    print(argument);
     print("\n");
     return;
 }

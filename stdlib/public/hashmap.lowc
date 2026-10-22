@@ -119,10 +119,11 @@ void hashmap_set(struct HashMap* map, u8 key, u8 value) {
         return;
 }
 
-u1 hashmap_get(struct HashMap* map, u8 key, u8* value) {
+u1, u8 hashmap_get(struct HashMap* map, u8 key) {
         u8 index  = 0;
         u8 probes = 0;
         u1 found  = 0;
+        u8 value  = 0;
 
         index  = hashmap_index(key, map->capacity);
         probes = 0;
@@ -131,14 +132,14 @@ u1 hashmap_get(struct HashMap* map, u8 key, u8* value) {
         for (; probes < map->capacity && found == 0 && map->states[index] != 0;
              probes = probes + 1) {
                 if (map->states[index] == 1 && map->keys[index] == key) {
-                        *value = map->values[index];
+                        value = map->values[index];
                         found  = 1;
                 } else {
                         index = (index + 1) % map->capacity;
                 }
         }
 
-        return found;
+        return found, value;
 }
 
 u1 hashmap_remove(struct HashMap* map, u8 key) {

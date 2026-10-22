@@ -4,10 +4,12 @@
 #include "@PUBLIC_ROOT@/string.lowc" : "parse_u8";
 
 u8 standard_library_numbers_test(void) {
+    u1 parsed = 0;
     u8 value = 0;
     s8 minimum = 0;
 
-    if (!parse_u8("0", &value) || value != 0) {
+    (parsed, value) = parse_u8("0");
+    if (!parsed || value != 0) {
         return 1;
     }
     print_u8(value);
@@ -22,26 +24,32 @@ u8 standard_library_numbers_test(void) {
     print_u8(8);
     print("|");
 
-    if (!parse_u8("18446744073709551615", &value)) {
+    (parsed, value) = parse_u8("18446744073709551615");
+    if (!parsed) {
         return 2;
     }
     print_u8(value);
     print("|");
 
-    if (!parse_u8("00000000000000000042", &value) || value != 42) {
+    (parsed, value) = parse_u8("00000000000000000042");
+    if (!parsed || value != 42) {
         return 3;
     }
 
-    if (parse_u8("", &value) || value != 42) {
+    (parsed, value) = parse_u8("");
+    if (parsed || value != 0) {
         return 4;
     }
-    if (parse_u8("-1", &value) || value != 42) {
+    (parsed, value) = parse_u8("-1");
+    if (parsed || value != 0) {
         return 5;
     }
-    if (parse_u8("12x", &value) || value != 42) {
+    (parsed, value) = parse_u8("12x");
+    if (parsed || value != 0) {
         return 6;
     }
-    if (parse_u8("18446744073709551616", &value) || value != 42) {
+    (parsed, value) = parse_u8("18446744073709551616");
+    if (parsed || value != 0) {
         return 7;
     }
 

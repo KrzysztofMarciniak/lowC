@@ -115,7 +115,7 @@ for mode in unoptimized optimized; do
         -o "$TEMP_DIR/args-$mode" ||
        ! "$TEMP_DIR/args-$mode" alpha "two words" \
             >"$TEMP_DIR/args-$mode.out" ||
-       ! printf '3|%s|alpha|two words|unchanged\n' "$TEMP_DIR/args-$mode" \
+       ! printf '3|%s|alpha|two words|missing\n' "$TEMP_DIR/args-$mode" \
             | cmp -s - "$TEMP_DIR/args-$mode.out"
     then
         echo "FAIL [standard library] $mode command-line argument access was incorrect"

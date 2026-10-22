@@ -1,12 +1,12 @@
 #include "@PUBLIC_ROOT@/network.lowc" :
     "TcpConnection", "tcp_connect", "tcp_close";
-#include "@PUBLIC_ROOT@/http.lowc" : "HttpResponse", "http_get";
+#include "@PUBLIC_ROOT@/http.lowc" : "http_get";
 #include "@PUBLIC_ROOT@/string.lowc" : "strcmp";
 
 u8 standard_library_network_http_test(u8 port) {
     struct TcpConnection connection = 0;
-    struct HttpResponse response = 0;
     u1 body[64] = 0;
+    s4 status_code = 0;
     s8 result = 0;
 
     if (tcp_connect("localhost", port, &connection) != 0) {
@@ -16,17 +16,20 @@ u8 standard_library_network_http_test(u8 port) {
         return 2;
     }
 
-    result = http_get("localhost", port, "/test", &body[0], 64, &response);
-    if (result != 12 || response.status_code != 200 ||
-        response.body_length != 12) {
+    (result, status_code) = http_get(
+        "localhost", port, "/test", &body[0], 64
+    );
+    if (result != 12 || status_code != 200) {
         return 3;
     }
-    body[response.body_length] = 0;
+    body[result] = 0;
     if (strcmp(&body[0], "hello world!") != 0) {
         return 4;
     }
-    if (http_get("localhost", port, "relative", &body[0], 64, &response) !=
-        -20003) {
+    (result, status_code) = http_get(
+        "localhost", port, "relative", &body[0], 64
+    );
+    if (result != -20003 || status_code != 0) {
         return 5;
     }
 
