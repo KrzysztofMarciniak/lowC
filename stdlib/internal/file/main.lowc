@@ -1,0 +1,43 @@
+s8 __lowc_file_open(u1 *path, s8 flags) {
+    s8 descriptor = 0;
+
+    asm("syscall"
+        : "=rax"(descriptor)
+        : "rax"(257), "rdi"(-100), "rsi"(path), "rdx"(flags), "r10"(420)
+        : "rcx", "r11", "memory", "cc");
+
+    return descriptor;
+}
+
+s8 __lowc_file_read(s8 descriptor, u1 *buffer, u8 length) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(0), "rdi"(descriptor), "rsi"(buffer), "rdx"(length)
+        : "rcx", "r11", "memory", "cc");
+
+    return result;
+}
+
+s8 __lowc_file_write(s8 descriptor, u1 *buffer, u8 length) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(1), "rdi"(descriptor), "rsi"(buffer), "rdx"(length)
+        : "rcx", "r11", "memory", "cc");
+
+    return result;
+}
+
+s8 __lowc_file_close(s8 descriptor) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(3), "rdi"(descriptor)
+        : "rcx", "r11", "memory", "cc");
+
+    return result;
+}

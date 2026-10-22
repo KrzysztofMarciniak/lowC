@@ -1,0 +1,15 @@
+s8 live_helper(s8 value) {
+    return value + 1;
+}
+
+s8 live_api(s8 value) {
+    return live_helper(value);
+}
+
+s8 dead_helper(s8 value) {
+    return value + 100;
+}
+
+s8 dead_api(s8 value) {
+    return dead_helper(value);
+}

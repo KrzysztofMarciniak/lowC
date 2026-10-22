@@ -1,0 +1,5 @@
+void entrypoint(void) {
+    if (0) {
+        return;
+    }
+}

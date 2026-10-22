@@ -1,0 +1,6 @@
+u1 expression_input = 42;
+
+void entrypoint(void) {
+    expression_input + 7;
+    return;
+}

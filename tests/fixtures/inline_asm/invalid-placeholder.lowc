@@ -1,0 +1,3 @@
+void invalid_placeholder(void) {
+    asm("mov %0, %1" : : :);
+}

@@ -1,0 +1,29 @@
+u1 result_x = 0;
+u1 result_y = 0;
+
+u1, u1 minushundred(u1 first, u1 second) {
+    return first - 100, second - 100;
+}
+
+void consume(u1 value) {
+    return;
+}
+
+void text(u1 *message) {
+    return;
+}
+
+void entrypoint(void) {
+    u1 x = 100;
+    u1 y = 200;
+    text("before");
+    consume(x);
+    consume(y);
+    (x, y) = minushundred(x, y);
+    text("after");
+    consume(x);
+    consume(y);
+    result_x = x;
+    result_y = y;
+    return;
+}

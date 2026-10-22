@@ -1,0 +1,5 @@
+u8 invalid_output(void) {
+    u8 result = 0;
+    asm("nop" : "=rsp"(result) : :);
+    return result;
+}

@@ -1,0 +1,16 @@
+u8 choose(u1 condition) {
+    if (condition) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+void do_nothing(void) {
+    return;
+}
+
+void entrypoint(void) {
+    do_nothing();
+    return;
+}

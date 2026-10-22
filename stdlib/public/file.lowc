@@ -1,0 +1,72 @@
+#include "../internal/file/main.lowc" :
+    "__lowc_file_open", "__lowc_file_read", "__lowc_file_write",
+    "__lowc_file_close";
+
+struct File {
+    s8 descriptor;
+};
+
+s8 file_open_read(u1 *path, struct File *file) {
+    s8 descriptor = 0;
+    s8 flags = 0;
+
+    file->descriptor = -1;
+    descriptor = __lowc_file_open(path, flags);
+    if (descriptor < 0) {
+        return descriptor;
+    }
+
+    file->descriptor = descriptor;
+    return 0;
+}
+
+s8 file_open_write(u1 *path, struct File *file) {
+    s8 descriptor = 0;
+    s8 flags = 577;
+
+    file->descriptor = -1;
+    descriptor = __lowc_file_open(path, flags);
+    if (descriptor < 0) {
+        return descriptor;
+    }
+
+    file->descriptor = descriptor;
+    return 0;
+}
+
+s8 file_open_append(u1 *path, struct File *file) {
+    s8 descriptor = 0;
+    s8 flags = 1089;
+
+    file->descriptor = -1;
+    descriptor = __lowc_file_open(path, flags);
+    if (descriptor < 0) {
+        return descriptor;
+    }
+
+    file->descriptor = descriptor;
+    return 0;
+}
+
+s8 file_read(struct File *file, u1 *buffer, u8 length) {
+    return __lowc_file_read(file->descriptor, buffer, length);
+}
+
+s8 file_write(struct File *file, u1 *buffer, u8 length) {
+    return __lowc_file_write(file->descriptor, buffer, length);
+}
+
+s8 file_close(struct File *file) {
+    s8 result = 0;
+
+    if (file->descriptor < 0) {
+        return -9;
+    }
+
+    result = __lowc_file_close(file->descriptor);
+    if (result == 0) {
+        file->descriptor = -1;
+    }
+
+    return result;
+}

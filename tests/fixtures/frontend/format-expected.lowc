@@ -1,0 +1,11 @@
+#include "a.lowc" : "a";
+#include "z.lowc" : "z";
+
+void entrypoint(void) {
+        u8 b = 2;
+        u8 a = 1;
+        if (a) {
+                b         = b + 1;
+                long_name = 2;
+        }
+}

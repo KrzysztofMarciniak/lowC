@@ -1,0 +1,20 @@
+foreign c u8 lowc_foreign_add(u8 left, u8 right);
+foreign c u8 lowc_foreign_length(u1 *text);
+foreign c u1 *lowc_foreign_identity(u1 *text);
+foreign c u1 lowc_foreign_unsigned_byte(void);
+foreign c s1 lowc_foreign_signed_byte(void);
+foreign c s4 puts(u1 *text);
+
+void entrypoint(void) {
+    if (
+        lowc_foreign_add(20, 22) == 42 &&
+        lowc_foreign_length(
+            lowc_foreign_identity("C ABI")
+        ) == 5 &&
+        lowc_foreign_unsigned_byte() == 200 &&
+        lowc_foreign_signed_byte() == -7
+    ) {
+        puts("C interoperability works");
+    }
+    return;
+}

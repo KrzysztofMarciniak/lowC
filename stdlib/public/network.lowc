@@ -1,0 +1,44 @@
+#include "../internal/network/main.lowc" :
+    "__lowc_tcp_connect", "__lowc_tcp_send", "__lowc_tcp_receive",
+    "__lowc_tcp_close";
+
+struct TcpConnection {
+    s4 descriptor;
+};
+
+s8 tcp_connect(u1 *host, u8 port, struct TcpConnection *connection) {
+    s4 descriptor = 0;
+    s8 result = 0;
+
+    connection->descriptor = -1;
+    result = __lowc_tcp_connect(host, port, &descriptor);
+    if (result != 0) {
+        return result;
+    }
+
+    connection->descriptor = descriptor;
+    return 0;
+}
+
+s8 tcp_send(struct TcpConnection *connection, u1 *buffer, u8 length) {
+    return __lowc_tcp_send(connection->descriptor, buffer, length);
+}
+
+s8 tcp_receive(struct TcpConnection *connection, u1 *buffer, u8 length) {
+    return __lowc_tcp_receive(connection->descriptor, buffer, length);
+}
+
+s8 tcp_close(struct TcpConnection *connection) {
+    s8 result = 0;
+
+    if (connection->descriptor < 0) {
+        return -9;
+    }
+
+    result = __lowc_tcp_close(connection->descriptor);
+    if (result == 0) {
+        connection->descriptor = -1;
+    }
+
+    return result;
+}

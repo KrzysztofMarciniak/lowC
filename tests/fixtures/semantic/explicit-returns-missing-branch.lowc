@@ -1,0 +1,5 @@
+u8 missing_return(u1 condition) {
+    if (condition) {
+        return 1;
+    }
+}

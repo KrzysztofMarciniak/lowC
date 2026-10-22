@@ -1,6 +1,0 @@
-foreign c s4 printf(u1 *format, u1 *text);
-
-void entrypoint(void) {
-    printf("Hello, %s\n", "World");
-    return;
-}

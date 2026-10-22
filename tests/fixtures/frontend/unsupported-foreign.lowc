@@ -1,0 +1,4 @@
+foreign forth u8 unsupported(void);
+void entrypoint(void) {
+    return;
+}

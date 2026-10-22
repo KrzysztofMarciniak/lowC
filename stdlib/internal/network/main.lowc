@@ -1,0 +1,131 @@
+struct AddrInfo {
+    s4 flags;
+    s4 family;
+    s4 socket_type;
+    s4 protocol;
+    u4 address_length;
+    u1 *address;
+    u1 *canonical_name;
+    struct AddrInfo *next;
+};
+
+foreign c s4 getaddrinfo(
+    u1 *node,
+    u1 *service,
+    struct AddrInfo *hints,
+    struct AddrInfo **result
+);
+foreign c void freeaddrinfo(struct AddrInfo *result);
+foreign c s4 socket(s4 family, s4 socket_type, s4 protocol);
+foreign c s4 connect(s4 descriptor, u1 *address, u4 address_length);
+foreign c s8 send(s4 descriptor, u1 *buffer, u8 length, s4 flags);
+foreign c s8 recv(s4 descriptor, u1 *buffer, u8 length, s4 flags);
+foreign c s4 close(s4 descriptor);
+foreign c s4 * __errno_location(void);
+
+s8 __lowc_tcp_connect(u1 *host, u8 port, s4 *connection_descriptor) {
+    u1 service[6] = 0;
+    u1 digit = 0;
+    u1 temporary = 0;
+    u8 digit_count = 0;
+    u8 index = 0;
+    struct AddrInfo hints = 0;
+    struct AddrInfo *results = 0;
+    struct AddrInfo *current = 0;
+    struct AddrInfo *end = 0;
+    s4 resolver_error = 0;
+    s4 descriptor = 0;
+    s4 connect_result = 0;
+    s4 last_error = -111;
+    s4 *error_number = 0;
+
+    if (port > 65535) {
+        return -22;
+    }
+
+    for (; port != 0 || digit_count == 0;) {
+        service[digit_count] = 48 + port % 10;
+        digit_count = digit_count + 1;
+        port = port / 10;
+    }
+
+    for (index = 0; index < digit_count / 2; index = index + 1) {
+        temporary = service[index];
+        service[index] = service[digit_count - index - 1];
+        service[digit_count - index - 1] = temporary;
+    }
+    service[digit_count] = 0;
+
+    hints.socket_type = 1;
+    resolver_error = getaddrinfo(host, &service[0], &hints, &results);
+    if (resolver_error != 0) {
+        if (resolver_error < 0) {
+            resolver_error = -resolver_error;
+        }
+        return -1000 - resolver_error;
+    }
+
+    current = results;
+    for (; current != end; current = current->next) {
+        descriptor = socket(
+            current->family,
+            current->socket_type,
+            current->protocol
+        );
+        if (descriptor < 0) {
+            error_number = __errno_location();
+            last_error = -*error_number;
+        } else {
+            connect_result = connect(
+                descriptor,
+                current->address,
+                current->address_length
+            );
+            if (connect_result == 0) {
+                *connection_descriptor = descriptor;
+                freeaddrinfo(results);
+                return 0;
+            }
+
+            error_number = __errno_location();
+            last_error = -*error_number;
+            close(descriptor);
+        }
+    }
+
+    freeaddrinfo(results);
+    return last_error;
+}
+
+s8 __lowc_tcp_send(s4 descriptor, u1 *buffer, u8 length) {
+    s8 result = 0;
+
+    result = send(descriptor, buffer, length, 16384);
+    if (result < 0) {
+        return -*__errno_location();
+    }
+
+    return result;
+}
+
+s8 __lowc_tcp_receive(s4 descriptor, u1 *buffer, u8 length) {
+    s8 result = 0;
+
+    result = recv(descriptor, buffer, length, 0);
+    if (result < 0) {
+        return -*__errno_location();
+    }
+
+    return result;
+}
+
+s8 __lowc_tcp_close(s4 descriptor) {
+    s4 result = 0;
+
+    result = close(descriptor);
+    if (result < 0) {
+        return -*__errno_location();
+    }
+
+    return 0;
+}

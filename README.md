@@ -31,20 +31,119 @@ Use `make portable` to build a statically linked Linux executable at
 Release builds favor a smaller executable and remain portable across x86-64
 CPUs; no host-specific instruction set is enabled.
 
-New to lowC? Run `make quick_start` for a hand-holding introduction to the language, followed by compiling and running a small example. The guide is also available in [`QUICK_START.md`](QUICK_START.md).
+### A complete lowC program
 
-Run `make example` to build and play through a small multi-file trail challenge.
-It exercises imported modules, structs, arrays, pointers and pointer arithmetic,
-globals, functions, loops, and conditionals:
+Save this as `hello.lowc`. The comments point out several rules that differ
+from the usual C entrypoint and variable conventions:
 
-```console
-$ make example
-Trail challenge complete! Score: 42 (expected 42)
+```c
+foreign c s4 puts(u1 *text); // Declare a C-ABI-compatible signature for puts.
+
+s8 add(s8 left, s8 right) {
+    return left + right; // Value-returning functions return explicitly.
+}
+
+void entrypoint(void) { // lowC executables begin here, not in main().
+    s8 answer = add(20, 22); // Every variable needs an initializer.
+    if (answer == 42) {
+        puts("The answer is 42");
+    }
+    return; // Even void functions explicitly return.
+}
 ```
 
-The lowC source is split across `example/trail/point.lowc`,
-`example/trail/route.lowc`, and `example/trail/main.lowc`. A small C harness
-prints and checks the score.
+Compile and run it:
+
+```sh
+build/lowc -o hello hello.lowc
+./hello
+```
+
+Expected output:
+
+```text
+The answer is 42
+```
+
+`puts` is provided by the C library. lowC does not parse C headers; the
+`foreign c` declaration tells the compiler the return type, parameter types,
+and C calling convention for this call. Pointer `const` qualifiers are not
+expressed by lowC's current type syntax.
+
+### Call a function from your own C file
+
+Keep the declaration and the C definition in agreement. `c-example.lowc`:
+
+```c
+foreign c u8 add_from_c(u8 left, u8 right); // Matches helper.c's signature.
+foreign c s4 puts(u1 *text);
+
+void entrypoint(void) {
+    u8 answer = add_from_c(19, 23);
+    if (answer == 42) {
+        puts("The C function returned 42");
+    }
+    return;
+}
+```
+
+`helper.c`:
+
+```c
+#include <stdint.h>
+
+uint64_t add_from_c(uint64_t left, uint64_t right)
+{
+    return left + right;
+}
+```
+
+Pass both source files to lowc; it compiles and links the C file with the
+program:
+
+```sh
+build/lowc -o c-example c-example.lowc helper.c
+./c-example
+```
+
+Expected output:
+
+```text
+The C function returned 42
+```
+
+For a prebuilt library, use `-L<path>` and `-l<name>`. The foreign interface
+uses fixed argument types; general variadic calls such as arbitrary `printf`
+calls are not supported.
+
+### How lowC differs from C
+
+| In C | In lowC |
+| --- | --- |
+| `int main(void)` is the usual program entrypoint. | Define exactly one `void entrypoint(void)`; the compiler supplies the platform `main` wrapper. |
+| `long count;` may be left uninitialized. | Every variable needs an initializer, for example `s8 count = 0;`. |
+| `int64_t` and `uint32_t` describe bit widths. | `s8` and `u4` name signed/unsigned integers by **byte width**. |
+| Arrays commonly decay to pointers in expressions. | Arrays keep their array type; write `&values[0]` to get an element pointer. |
+| C headers declare APIs through `#include`. | Declare C calls with `foreign c`; lowC does not parse C headers. |
+| C functions return one value. | LowC functions may return several values using tuple assignment (the C ABI does not support this lowC feature). |
+| A `void` function can reach its closing brace. | Every lowC function needs an explicit `return` on every normal path. |
+| C leaves argument evaluation order unspecified for many operators. | lowC evaluates function arguments from right to left. |
+
+In C, array-to-pointer decay lets a pointer take the array's first-element
+address implicitly:
+
+```c
+int64_t values[3] = {0};
+int64_t *pointer = values; // C implicitly uses &values[0].
+```
+
+In lowC, write the address explicitly:
+
+```c
+s8 values[3] = 0; // Arrays and structs can be zero-initialized this way.
+s8 *pointer = 0;
+pointer = &values[0]; // Required; `pointer = values` is invalid in lowC.
+```
 
 Install the compiler as `/usr/local/bin/lowc` (use `sudo` if needed), or choose a different prefix:
 
@@ -93,13 +192,19 @@ Executable output is assembled and linked with the system C compiler driver
 define exactly one `void entrypoint(void)`. The compiler supplies the platform
 `main` wrapper.
 
-Run the compiler and generated-code checks with:
+Build the compiler and run the compiler and generated-code checks with:
 
 ```sh
-./example/tests/run_tests.sh
+make test
+make test TEST=optimization
 ```
 
-The suite parses every example, assembles generated output, and checks executable behavior with both optimized and unoptimized assembly.
+The suite parses and assembles every smoke example, then runs focused test
+areas. Use `TEST=smoke`, `TEST=frontend`, `TEST=modules`, `TEST=optimization`,
+`TEST=semantic`, `TEST=standard_library`, or `TEST=inline_asm` to run one area.
+
+The top-level `tests/` tree separates compiler smoke inputs, shared fixtures,
+focused integration suites, and common Bash helpers.
 
 ## Motivation
 
@@ -146,9 +251,12 @@ Every variable must have an initializer. Use `= 0` for an explicit zero
 initial value; arrays and struct values can also be zero-initialized this way.
 
 ```c
-u8 x = 0;
-u8 y = 42;
+s8 x = 0; // `s8` is a signed 8-byte integer.
+u4 y = 42; // `u4` is an unsigned 4-byte integer.
 ```
+
+Unlike C, these declarations cannot omit an initializer; use `= 0` when the
+initial value should be zero.
 
 ### Assignment
 
@@ -208,12 +316,10 @@ conditions is not defined.
 ### Declaration and Usage
 
 ```c
-u8 *p = 0;
-
-p = &x;
-
-*p;
-*p = 42;
+u8 value = 0;
+u8 *p = 0; // Zero is accepted as a null pointer initializer.
+p = &value; // Take the address explicitly.
+*p = 42; // Dereference the pointer to update value.
 ```
 
 Pointer arithmetic is automatically scaled by the size of the pointed-to type.
@@ -232,7 +338,7 @@ assignment is otherwise not allowed.
 ```c
 u8 values[10] = 0;
 
-values[0] = 42;
+values[0] = 42; // Set the first element.
 ```
 
 Array lengths must be decimal integer literals; expressions and negative
@@ -249,13 +355,13 @@ An array expression retains its array type and cannot be implicitly assigned to 
 s8 values[5] = 0;
 s8 *p = 0;
 
-p = values;        // invalid
+p = values; // Invalid: lowC arrays do not decay to pointers.
 ```
 
 To obtain a pointer to an array element, use the address-of operator explicitly:
 
 ```c
-p = &values[0];    // valid
+p = &values[0]; // Valid: take the first element's address.
 ```
 
 Array indexing is equivalent to pointer arithmetic followed by dereferencing:
@@ -284,7 +390,7 @@ struct Point {
     s8 y;
 };
 
-struct Point p = 0;
+struct Point p = 0; // Explicitly zero-initialize both fields.
 
 p.x = 10;
 p.y = 20;
@@ -298,9 +404,11 @@ every C compiler's ABI.
 ### Pointer Access
 
 ```c
+struct Point point = 0;
 struct Point *p = 0;
 
-p->x = 10;
+p = &point; // Initialize the pointer before dereferencing it.
+p->x = 10; // `->` accesses a field through a pointer.
 ```
 
 ### Arrays of Structs
@@ -327,7 +435,7 @@ Array indexing is performed before member access, so points[1].x accesses the x 
 
 ```c
 s8 add(s8 a, s8 b) {
-    return a + b;
+    return a + b; // Return a value explicitly.
 }
 ```
 
@@ -342,10 +450,10 @@ s8, s8 divide(s8 numerator, s8 denominator) {
 }
 
 void entrypoint(void) {
-    s8 quotient = 0;
+    s8 quotient = 0; // Initialize each assignment target.
     s8 remainder = 0;
 
-    (quotient, remainder) = divide(37, 5);
+    (quotient, remainder) = divide(37, 5); // C functions return one value.
     return;
 }
 ```
@@ -402,29 +510,32 @@ Unlike C, lowC does not use `main()` as the program entrypoint.
 
 ### Calling C functions
 
-Call the C library's `printf` directly:
+Use `foreign c` to declare a fixed C-ABI-compatible signature for the call.
+For example, the C library's `puts` accepts one string pointer and prints a
+newline:
 
 ```c
-foreign c s4 printf(u1 *format, u1 *text);
+foreign c s4 puts(u1 *text); // s4 matches C's 4-byte int return type.
 
 void entrypoint(void) {
-    printf("Hello, %s!\n", "World");
-    return;
+    puts("Hello from lowC"); // Calls the C library function directly.
+    return; // lowC requires an explicit return, even for void functions.
 }
 ```
 
-Build as usual; the default C driver links the C standard library:
+Build as usual; the system C driver links the C standard library:
 
 ```sh
 build/lowc -o hello hello.lowc
 ```
 
-The `foreign c` declaration gives lowC the fixed argument types used here.
-General variadic calls, such as passing floating-point values to `printf`, are
-not supported.
+The declaration gives lowC the return and argument types and selects the C
+calling convention. General variadic calls are not supported, so this is not a
+general-purpose `printf` declaration.
 
-For your own C function, declare its signature with `foreign c` and pass the
-`.c` file on the same command line. lowC compiles and links it for you:
+For a complete caller and matching C implementation, see the commented
+`c-example.lowc` and `helper.c` example above. Pass the `.c` file on the same
+command line; lowC compiles and links it for you:
 
 ```sh
 build/lowc -o hello hello.lowc helper.c
@@ -447,24 +558,24 @@ including multi-return result buffers, is internal and is not a C ABI.
 ### Conditionals
 
 ```c
-if (condition) {
-    ...
-}
-```
-
-```c
-if (condition) {
-    ...
-} else {
-    ...
+s8 positive_part(s8 value) {
+    if (value > 0) {
+        return value; // Both branches return a value.
+    } else {
+        return 0;
+    }
 }
 ```
 
 ### Loops
 
 ```c
-for (init; condition; increment) {
-    ...
+s8 sum_to(s8 limit) {
+    s8 total = 0; // Initialize the accumulator.
+    for (s8 i = 1; i <= limit; i = i + 1) {
+        total = total + i;
+    }
+    return total; // Loops may run zero times.
 }
 ```
 
@@ -494,7 +605,8 @@ Every `.lowc` file can be used as a module. lowC does not use separate header fi
 Modules can explicitly import functions, structs, and variables:
 
 ```c
-#include "math.lowc" : "add", "sqrt"
+// Import only the name this file needs.
+#include "math.lowc" : "add";
 ```
 
 For example:
@@ -506,8 +618,8 @@ s8 add(s8 a, s8 b) {
     return a + b;
 }
 
-s8 sqrt(s8 x) {
-    ...
+s8 square(s8 value) {
+    return value * value; // Other declarations stay private to the module.
 }
 ```
 
@@ -517,7 +629,7 @@ s8 sqrt(s8 x) {
 #include "math.lowc" : "add";
 
 void entrypoint(void) {
-    s8 result = add(10, 20);
+    s8 result = add(10, 20); // `square` is not imported here.
     return;
 }
 ```
@@ -684,6 +796,92 @@ The initial capacity is raised to at least eight and the map grows before its
 load reaches 75%. Keys and values are unsigned 64-bit integers; `hashmap_remove`
 marks removed slots for reuse, and `hashmap_deinit` releases the map's backing
 allocations. Do not use the map after deinitializing it.
+
+The `file.lowc` module provides descriptor-based file operations. Opening a
+file fills a `File` struct; read and write return the number of bytes
+transferred, zero from `file_read` means end-of-file, and `file_close` releases
+the descriptor:
+
+```c
+#include "/usr/local/share/lowc/public/file.lowc" :
+    "File", "file_open_write", "file_write", "file_close";
+
+u1 write_example(void) {
+    struct File file = 0;
+    s8 result = file_open_write("notes.txt", &file);
+    if (result != 0) {
+        return 0;
+    }
+
+    result = file_write(&file, "Hello\n", 6);
+    if (result != 6) {
+        file_close(&file);
+        return 0;
+    }
+    return file_close(&file) == 0;
+}
+```
+
+`file_open_read` opens an existing file, `file_open_write` creates or
+truncates it, and `file_open_append` creates it if needed and appends. File
+operations return negative Linux `errno` values on failure; reads and writes
+may be partial, so loop when the full requested length is required. Close each
+successfully opened file once.
+
+The `network.lowc` module provides a hostname-resolving TCP client. A
+`TcpConnection` struct owns the connected socket:
+
+```c
+#include "/usr/local/share/lowc/public/network.lowc" :
+    "TcpConnection", "tcp_connect", "tcp_send", "tcp_receive", "tcp_close";
+
+s8 tcp_example(void) {
+    struct TcpConnection connection = 0;
+    s8 result = tcp_connect("example.com", 80, &connection);
+    if (result != 0) {
+        return result;
+    }
+
+    result = tcp_send(&connection, "GET / HTTP/1.0\r\n\r\n", 18);
+    tcp_close(&connection);
+    return result;
+}
+```
+
+`tcp_send` and `tcp_receive` return transferred byte counts, zero on orderly
+receive closure, or a negative `errno`; handle partial sends when transmitting
+larger buffers. Resolver failures are returned as `-1000 - abs(EAI error)`.
+Call `tcp_close` once for every successful connection.
+
+The `http.lowc` module performs a basic plain-HTTP GET and writes the body to a
+caller-provided buffer:
+
+```c
+#include "/usr/local/share/lowc/public/http.lowc" :
+    "HttpResponse", "http_get";
+
+s8 http_example(void) {
+    struct HttpResponse response = 0;
+    u1 body[1024] = 0;
+    s8 body_length = http_get(
+        "example.com", 80, "/", body, 1023, &response
+    );
+    if (body_length < 0) {
+        return body_length;
+    }
+
+    body[body_length] = 0;
+    return response.status_code;
+}
+```
+
+On success `http_get` returns the body length and fills `HttpResponse` with the
+HTTP status and body length. Errors are negative: `-20001` for malformed or
+incomplete headers, `-20002` when the body does not fit, `-20003` for an
+invalid host/path, `-20004` for a zero-byte request send, and `-20005` for
+chunked responses (which are not decoded). Network errors are propagated.
+This initial client uses plain HTTP only; it does not support TLS, redirects,
+proxies, or chunked transfer encoding.
 
 Use your configured `PREFIX` in standard-library import paths when it differs
 from `/usr/local`.

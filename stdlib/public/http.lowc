@@ -1,0 +1,231 @@
+#include "network.lowc" :
+    "TcpConnection", "tcp_connect", "tcp_send", "tcp_receive", "tcp_close";
+#include "string.lowc" : "strlen";
+
+struct HttpResponse {
+    s4 status_code;
+    u8 body_length;
+};
+
+u1 __lowc_http_valid_field(u1 *value) {
+    u8 index = 0;
+
+    if (value[0] == 0) {
+        return 0;
+    }
+
+    for (; value[index] != 0; index = index + 1) {
+        if (value[index] == 13 || value[index] == 10) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+u1 __lowc_http_has_chunked(u1 *headers, u8 length) {
+    u8 index = 0;
+
+    for (; index + 7 <= length; index = index + 1) {
+        if (
+            (headers[index] == 99 || headers[index] == 67) &&
+            (headers[index + 1] == 104 || headers[index + 1] == 72) &&
+            (headers[index + 2] == 117 || headers[index + 2] == 85) &&
+            (headers[index + 3] == 110 || headers[index + 3] == 78) &&
+            (headers[index + 4] == 107 || headers[index + 4] == 75) &&
+            (headers[index + 5] == 101 || headers[index + 5] == 69) &&
+            (headers[index + 6] == 100 || headers[index + 6] == 68)
+        ) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+s8 __lowc_http_send_all(
+    struct TcpConnection *connection,
+    u1 *buffer,
+    u8 length
+) {
+    s8 written = 0;
+
+    for (; length != 0;) {
+        written = tcp_send(connection, buffer, length);
+        if (written < 0) {
+            return written;
+        }
+        if (written == 0) {
+            return -20004;
+        }
+
+        buffer = buffer + written;
+        length = length - written;
+    }
+
+    return 0;
+}
+
+s8 http_get(
+    u1 *host,
+    u8 port,
+    u1 *path,
+    u1 *body,
+    u8 body_capacity,
+    struct HttpResponse *response
+) {
+    struct TcpConnection connection = 0;
+    u1 chunk[1024] = 0;
+    u1 headers[4096] = 0;
+    u8 header_length = 0;
+    s8 received = 0;
+    u8 index = 0;
+    u8 body_length = 0;
+    u8 status_index = 0;
+    u8 digit_index = 0;
+    u8 digit = 0;
+    u1 header_complete = 0;
+    u1 status_found = 0;
+    s4 status_code = 0;
+    s8 result = 0;
+
+    response->status_code = 0;
+    response->body_length = 0;
+
+    if (
+        __lowc_http_valid_field(host) == 0 ||
+        __lowc_http_valid_field(path) == 0 ||
+        path[0] != 47
+    ) {
+        return -20003;
+    }
+
+    result = tcp_connect(host, port, &connection);
+    if (result != 0) {
+        return result;
+    }
+
+    result = __lowc_http_send_all(&connection, "GET ", 4);
+    if (result == 0) {
+        result = __lowc_http_send_all(&connection, path, strlen(path));
+    }
+    if (result == 0) {
+        result = __lowc_http_send_all(
+            &connection,
+            " HTTP/1.0\r\nHost: ",
+            17
+        );
+    }
+    if (result == 0) {
+        result = __lowc_http_send_all(&connection, host, strlen(host));
+    }
+    if (result == 0) {
+        result = __lowc_http_send_all(
+            &connection,
+            "\r\nConnection: close\r\n\r\n",
+            23
+        );
+    }
+    if (result != 0) {
+        tcp_close(&connection);
+        return result;
+    }
+
+    for (; header_complete == 0;) {
+        received = tcp_receive(&connection, &chunk[0], 1024);
+        if (received < 0) {
+            tcp_close(&connection);
+            return received;
+        }
+        if (received == 0) {
+            tcp_close(&connection);
+            return -20001;
+        }
+
+        for (index = 0; index < received && header_complete == 0;
+             index = index + 1) {
+            if (header_length == 4096) {
+                tcp_close(&connection);
+                return -20001;
+            }
+
+            headers[header_length] = chunk[index];
+            header_length = header_length + 1;
+            if (
+                header_length >= 4 &&
+                headers[header_length - 4] == 13 &&
+                headers[header_length - 3] == 10 &&
+                headers[header_length - 2] == 13 &&
+                headers[header_length - 1] == 10
+            ) {
+                header_complete = 1;
+                index = index + 1;
+                for (; index < received; index = index + 1) {
+                    if (body_length == body_capacity) {
+                        tcp_close(&connection);
+                        return -20002;
+                    }
+                    body[body_length] = chunk[index];
+                    body_length = body_length + 1;
+                }
+            }
+        }
+    }
+
+    if (__lowc_http_has_chunked(&headers[0], header_length)) {
+        tcp_close(&connection);
+        return -20005;
+    }
+
+    for (index = 0; index < header_length && headers[index] != 32;
+         index = index + 1) {
+    }
+    if (index == header_length || index + 3 >= header_length) {
+        tcp_close(&connection);
+        return -20001;
+    }
+
+    status_index = index + 1;
+    status_found = 1;
+    for (digit_index = 0; digit_index < 3; digit_index = digit_index + 1) {
+        digit = headers[status_index + digit_index];
+        if (digit < 48 || digit > 57) {
+            status_found = 0;
+        } else {
+            status_code = status_code * 10 + digit - 48;
+        }
+    }
+    if (status_found == 0) {
+        tcp_close(&connection);
+        return -20001;
+    }
+    response->status_code = status_code;
+
+    received = -1;
+    for (; received != 0;) {
+        received = tcp_receive(&connection, &chunk[0], 1024);
+        if (received < 0) {
+            tcp_close(&connection);
+            return received;
+        }
+        if (received != 0) {
+            if (received > body_capacity - body_length) {
+                tcp_close(&connection);
+                return -20002;
+            }
+
+            for (index = 0; index < received; index = index + 1) {
+                body[body_length + index] = chunk[index];
+            }
+            body_length = body_length + received;
+        }
+    }
+
+    result = tcp_close(&connection);
+    if (result != 0) {
+        return result;
+    }
+
+    response->body_length = body_length;
+    return body_length;
+}

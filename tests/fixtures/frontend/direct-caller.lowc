@@ -1,0 +1,9 @@
+foreign c u8 lowc_direct_add(u8 left, u8 right);
+foreign c s4 puts(u1 *text);
+
+void entrypoint(void) {
+    if (lowc_direct_add(20, 22) == 42) {
+        puts("Direct C source works");
+    }
+    return;
+}

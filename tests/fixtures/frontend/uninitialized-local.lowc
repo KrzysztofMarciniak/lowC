@@ -1,0 +1,4 @@
+void entrypoint(void) {
+    u1 value;
+    return;
+}

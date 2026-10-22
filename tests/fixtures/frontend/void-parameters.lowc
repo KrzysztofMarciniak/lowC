@@ -1,0 +1,12 @@
+void no_arguments(void) {
+    return;
+}
+
+void takes_void_pointer(void *pointer) {
+    return;
+}
+
+void entrypoint(void) {
+    no_arguments();
+    return;
+}

@@ -1,0 +1,3 @@
+void invalid_output_lvalue(void) {
+    asm("nop" : "=rax"(42) : :);
+}

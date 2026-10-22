@@ -1,0 +1,5 @@
+u8 maybe_return(u1 condition) {
+    for (; condition;) {
+        return 1;
+    }
+}

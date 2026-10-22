@@ -1,4 +1,0 @@
-struct Point {
-    s8 x;
-    s8 y;
-};

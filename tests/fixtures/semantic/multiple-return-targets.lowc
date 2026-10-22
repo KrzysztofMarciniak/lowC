@@ -1,0 +1,10 @@
+u1, u1 pair(void) {
+    return 1, 2;
+}
+
+void entrypoint(void) {
+    u1 first = 0;
+    u1 second = 0;
+    u1 third = 0;
+    (first, second, third) = pair();
+}

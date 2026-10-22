@@ -1,0 +1,42 @@
+#include "@PUBLIC_ROOT@/args.lowc" :
+    "args_count", "args_get";
+#include "@PUBLIC_ROOT@/print.lowc" :
+    "print", "print_u8";
+
+void entrypoint(void) {
+    u8 count = 0;
+    u1 *argument = 0;
+
+    count = args_count();
+    print_u8(count);
+    print("|");
+
+    if (args_get(0, &argument)) {
+        print(argument);
+    } else {
+        print("missing");
+    }
+    print("|");
+
+    if (args_get(1, &argument)) {
+        print(argument);
+    } else {
+        print("missing");
+    }
+    print("|");
+
+    if (args_get(2, &argument)) {
+        print(argument);
+    } else {
+        print("missing");
+    }
+    print("|");
+
+    argument = "unchanged";
+    if (args_get(count, &argument)) {
+        print("unexpected");
+    }
+    print(argument);
+    print("\n");
+    return;
+}

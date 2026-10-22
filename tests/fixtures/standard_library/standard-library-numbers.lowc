@@ -1,0 +1,63 @@
+#include "@PUBLIC_ROOT@/print.lowc" :
+    "print", "print_u1", "print_u2", "print_u4", "print_u8",
+    "print_s1", "print_s2", "print_s4", "print_s8";
+#include "@PUBLIC_ROOT@/string.lowc" : "parse_u8";
+
+u8 standard_library_numbers_test(void) {
+    u8 value = 0;
+    s8 minimum = 0;
+
+    if (!parse_u8("0", &value) || value != 0) {
+        return 1;
+    }
+    print_u8(value);
+    print("|");
+
+    print_u1(1);
+    print("|");
+    print_u2(2);
+    print("|");
+    print_u4(4);
+    print("|");
+    print_u8(8);
+    print("|");
+
+    if (!parse_u8("18446744073709551615", &value)) {
+        return 2;
+    }
+    print_u8(value);
+    print("|");
+
+    if (!parse_u8("00000000000000000042", &value) || value != 42) {
+        return 3;
+    }
+
+    if (parse_u8("", &value) || value != 42) {
+        return 4;
+    }
+    if (parse_u8("-1", &value) || value != 42) {
+        return 5;
+    }
+    if (parse_u8("12x", &value) || value != 42) {
+        return 6;
+    }
+    if (parse_u8("18446744073709551616", &value) || value != 42) {
+        return 7;
+    }
+
+    print_s1(-1);
+    print("|");
+    print_s2(-1);
+    print("|");
+    print_s4(-1);
+    print("|");
+    print_s8(-1);
+    print("|");
+    asm("mov %0, 0x8000000000000000" : "=rax"(minimum) : :);
+    print_s8(minimum);
+    print("|");
+    print_s8(9223372036854775807);
+    print("|done\n");
+
+    return 0;
+}

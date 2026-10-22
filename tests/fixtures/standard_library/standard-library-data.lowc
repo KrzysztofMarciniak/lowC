@@ -1,0 +1,62 @@
+#include "@PUBLIC_ROOT@/string.lowc" :
+    "strlen", "strcmp", "strcpy", "strcat", "strdup";
+#include "@PUBLIC_ROOT@/memory.lowc" :
+    "alloc", "dealloc";
+#include "@PUBLIC_ROOT@/hashmap.lowc" :
+    "HashMap", "hashmap_init", "hashmap_set", "hashmap_get",
+    "hashmap_remove", "hashmap_deinit";
+
+u8 standard_library_data_test(void) {
+    u1 *buffer = 0;
+    u1 *copy = 0;
+    struct HashMap map = 0;
+    u8 value = 0;
+    u8 high_key = 0;
+    u8 index = 0;
+
+    buffer = alloc(32);
+    strcpy(buffer, "low");
+    strcat(buffer, "C");
+    if (strcmp(buffer, "lowC") != 0 || strlen(buffer) != 4) {
+        return 1;
+    }
+
+    copy = strdup(buffer);
+    if (strcmp(copy, "lowC") != 0 || dealloc(copy) == 0) {
+        return 2;
+    }
+
+    hashmap_init(&map, 8);
+    for (index = 0; index < 12; index = index + 1) {
+        hashmap_set(&map, index, index * 7);
+    }
+
+    asm("mov %0, 0x8000000000000000" : "=rax"(high_key) : :);
+    hashmap_set(&map, high_key, 99);
+    if (hashmap_get(&map, high_key, &value) == 0 || value != 99) {
+        return 3;
+    }
+
+    if (hashmap_get(&map, 8, &value) == 0 || value != 56) {
+        return 4;
+    }
+
+    if (hashmap_remove(&map, 8) == 0 || hashmap_get(&map, 8, &value) != 0) {
+        return 5;
+    }
+
+    hashmap_set(&map, 24, 168);
+    if (hashmap_get(&map, 24, &value) == 0 || value != 168) {
+        return 6;
+    }
+
+    if (hashmap_get(&map, 9, &value) == 0 || value != 63) {
+        return 7;
+    }
+
+    if (hashmap_deinit(&map) == 0 || dealloc(buffer) == 0) {
+        return 8;
+    }
+
+    return 0;
+}

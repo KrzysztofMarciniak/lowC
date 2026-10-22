@@ -1,0 +1,6 @@
+u8 divisor = 0;
+
+void entrypoint(void) {
+    divisor / divisor;
+    return;
+}

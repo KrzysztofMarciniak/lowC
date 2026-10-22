@@ -1,0 +1,10 @@
+#include "dependencies.lowc" : "live_api", "dead_api";
+
+s8 root_unused(void) {
+    return 99;
+}
+
+void entrypoint(void) {
+    s8 result = live_api(4);
+    return;
+}

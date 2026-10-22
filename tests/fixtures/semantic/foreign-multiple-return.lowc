@@ -1,0 +1,1 @@
+foreign c u1, u1 invalid_foreign(void);
