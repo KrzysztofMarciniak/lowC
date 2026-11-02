@@ -4,6 +4,55 @@
 
 A small C-like systems language and compiler.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Build and Run](#build-and-run)
+  - [A complete lowC program](#a-complete-lowc-program)
+  - [Call a function from your own C file](#call-a-function-from-your-own-c-file)
+  - [How lowC differs from C](#how-lowc-differs-from-c)
+- [Practical examples](#practical-examples)
+  - [Sum an array](#sum-an-array)
+  - [List command-line arguments](#list-command-line-arguments)
+  - [Count bytes in a file](#count-bytes-in-a-file)
+  - [Store values in a hash map](#store-values-in-a-hash-map)
+  - [Fetch a local HTTP page](#fetch-a-local-http-page)
+- [Motivation](#motivation)
+- [Type System](#type-system)
+  - [Unsigned Integers](#unsigned-integers)
+  - [Signed Integers](#signed-integers)
+  - [Other Types](#other-types)
+- [Variables](#variables)
+  - [Declaration](#declaration)
+  - [Assignment](#assignment)
+- [Operators](#operators)
+  - [Arithmetic](#arithmetic)
+  - [Comparisons](#comparisons)
+  - [Logic](#logic)
+- [Pointers](#pointers)
+  - [Declaration and Usage](#declaration-and-usage)
+- [Arrays](#arrays)
+  - [Declaration and Access](#declaration-and-access)
+  - [Array-to-Pointer Conversion](#array-to-pointer-conversion)
+- [Structs](#structs)
+  - [Definition and Usage](#definition-and-usage)
+  - [Pointer Access](#pointer-access)
+  - [Arrays of Structs](#arrays-of-structs)
+- [Functions](#functions)
+  - [Basic Functions](#basic-functions)
+  - [Multiple Return Values](#multiple-return-values)
+  - [Void Functions](#void-functions)
+  - [Entrypoint](#entrypoint)
+  - [Calling C functions](#calling-c-functions)
+- [Control Flow](#control-flow)
+  - [Conditionals](#conditionals)
+  - [Loops](#loops)
+  - [Return Statements](#return-statements)
+- [Modules](#modules)
+- [Standard library](#standard-library)
+- [Formatting](#formatting)
+- [Inline assembly](#inline-assembly)
+
 ## Overview
 
 lowC is a compact compiled language with a clean, C-inspired syntax. It provides explicit control over data representation and memory while keeping the language and compiler straightforward.
@@ -160,6 +209,27 @@ make install PREFIX="$HOME/.local"
 make install DESTDIR=/tmp/lowc-stage PREFIX=/usr
 ```
 
+To install lowC and its standard library under your home directory, use a
+user-owned prefix:
+
+```sh
+make install PREFIX="$HOME/.lowc" LOWC_STDLIB_DIR="$HOME/.lowc/share/lowc"
+```
+
+Add the compiler to your shell's `PATH`, for example in `~/.profile`:
+
+```sh
+export PATH="$HOME/.lowc/bin:$PATH"
+```
+
+You can add your own modules under `~/.lowc/share/lowc/public` and import
+them with the `public/` prefix. To use a different library tree, set
+`LOWC_STDLIB_DIR` to its root directory, the directory containing `public`:
+
+```sh
+export LOWC_STDLIB_DIR="$HOME/.lowc/share/lowc"
+```
+
 By default, lowC compiles a source file to an executable named `a.out`:
 
 ```sh
@@ -207,6 +277,256 @@ areas. Use `TEST=smoke`, `TEST=frontend`, `TEST=modules`, `TEST=optimization`,
 
 The top-level `tests/` tree separates compiler smoke inputs, shared fixtures,
 focused integration suites, and common Bash helpers.
+
+## Practical examples
+
+These complete programs can be saved as the named `.lowc` files and compiled
+with `build/lowc`. They use the public standard library installed by
+`make install`; set `LOWC_STDLIB_DIR` if it is in a custom location.
+
+### Sum an array
+
+This small program initializes an array, loops over it, and prints the total.
+Save it as `sum.lowc`:
+
+```c
+import public/print.lowc : print, print_s8;
+
+void entrypoint(void) {
+    s8 values[5] = 0;
+    s8 total = 0;
+    s8 index = 0;
+
+    values[0] = 1;
+    values[1] = 2;
+    values[2] = 3;
+    values[3] = 4;
+    values[4] = 5;
+
+    for (index = 0; index < 5; index = index + 1) {
+        total = total + values[index];
+    }
+
+    print("sum = ");
+    print_s8(total);
+    print("\n");
+    return;
+}
+```
+
+```sh
+build/lowc -o sum sum.lowc
+./sum
+```
+
+Output:
+
+```text
+sum = 15
+```
+
+### List command-line arguments
+
+`args_count()` includes the executable at index zero. This program starts at
+index one to print only the arguments supplied by the user. Save it as
+`list-args.lowc`:
+
+```c
+import public/args.lowc : args_count, args_get;
+import public/print.lowc : print;
+
+void entrypoint(void) {
+    u8 count = 0;
+    u8 index = 0;
+    u1 found = 0;
+    u1 *argument = 0;
+
+    count = args_count();
+    for (index = 1; index < count; index = index + 1) {
+        (found, argument) = args_get(index);
+        if (found) {
+            print(argument);
+            print("\n");
+        }
+    }
+    return;
+}
+```
+
+```sh
+build/lowc -o list-args list-args.lowc
+./list-args alpha "two words"
+```
+
+Output:
+
+```text
+alpha
+two words
+```
+
+### Count bytes in a file
+
+This program reads a file in chunks and continues until `file_read` reports
+end-of-file. Save it as `count-bytes.lowc`:
+
+```c
+import public/args.lowc : args_count, args_get;
+import public/file.lowc : File, file_open_read, file_read, file_close;
+import public/print.lowc : print, print_s8;
+
+void entrypoint(void) {
+    struct File file = 0;
+    u8 count = 0;
+    u1 found = 0;
+    u1 *path = 0;
+    u1 buffer[256] = 0;
+    s8 result = 1;
+    s8 total = 0;
+
+    count = args_count();
+    if (count != 2) {
+        print("usage: count-bytes FILE\n");
+        return;
+    }
+
+    (found, path) = args_get(1);
+    if (found == 0 || file_open_read(path, &file) != 0) {
+        print("could not open file\n");
+        return;
+    }
+
+    for (; result > 0;) {
+        result = file_read(&file, &buffer[0], 256);
+        if (result < 0) {
+            file_close(&file);
+            print("file read failed\n");
+            return;
+        }
+        total = total + result;
+    }
+
+    if (file_close(&file) != 0) {
+        print("file close failed\n");
+        return;
+    }
+
+    print("bytes: ");
+    print_s8(total);
+    print("\n");
+    return;
+}
+```
+
+```sh
+build/lowc -o count-bytes count-bytes.lowc
+printf 'lowC\n' > sample.txt
+./count-bytes sample.txt
+```
+
+Output:
+
+```text
+bytes: 5
+```
+
+### Store values in a hash map
+
+The standard-library map stores `u8` keys and values. This example records
+inventory quantities and looks up an item by its numeric ID. Save it as
+`inventory.lowc`:
+
+```c
+import public/hashmap.lowc : HashMap, hashmap_init, hashmap_set, hashmap_get,
+    hashmap_deinit;
+import public/print.lowc : print, print_u8;
+
+void entrypoint(void) {
+    struct HashMap inventory = 0;
+    u1 found = 0;
+    u8 quantity = 0;
+
+    hashmap_init(&inventory, 8);
+    hashmap_set(&inventory, 1001, 4);
+    hashmap_set(&inventory, 1002, 9);
+
+    (found, quantity) = hashmap_get(&inventory, 1001);
+    if (found) {
+        print("item 1001 quantity: ");
+        print_u8(quantity);
+        print("\n");
+    }
+
+    hashmap_deinit(&inventory);
+    return;
+}
+```
+
+```sh
+build/lowc -o inventory inventory.lowc
+./inventory
+```
+
+Output:
+
+```text
+item 1001 quantity: 4
+```
+
+Call `hashmap_deinit` when finished with the map so its backing allocations
+are released.
+
+### Fetch a local HTTP page
+
+This example fetches a page over plain HTTP and prints its status and body.
+It uses a local server so it does not depend on an external host. Save it as
+`fetch-page.lowc`:
+
+```c
+import public/http.lowc : http_get;
+import public/print.lowc : print, print_s4, print_s8;
+
+void entrypoint(void) {
+    u1 body[4096] = 0;
+    s8 body_length = 0;
+    s4 status_code = 0;
+
+    (body_length, status_code) = http_get(
+        "127.0.0.1", 8000, "/", &body[0], 4095
+    );
+    if (body_length < 0) {
+        print("request failed: ");
+        print_s8(body_length);
+        print("\n");
+        return;
+    }
+
+    body[body_length] = 0;
+    print("HTTP status: ");
+    print_s4(status_code);
+    print("\n");
+    print(&body[0]);
+    print("\n");
+    return;
+}
+```
+
+Start a local HTTP server in one terminal:
+
+```sh
+python3 -m http.server 8000 --bind 127.0.0.1
+```
+
+Then compile and run the client in another terminal:
+
+```sh
+build/lowc -o fetch-page fetch-page.lowc
+./fetch-page
+```
+
+The server's HTML is printed after the `HTTP status: 200` line. The standard
+library HTTP client supports plain HTTP only, not TLS, redirects, or chunked
+responses.
 
 ## Motivation
 
@@ -896,9 +1216,13 @@ chunked responses (which are not decoded). Network errors are propagated.
 This initial client uses plain HTTP only; it does not support TLS, redirects,
 proxies, or chunked transfer encoding.
 
-`public/...` imports resolve beneath the configured `PREFIX/share/lowc` (by
-default `/usr/local/share/lowc`). Set `LOWC_STDLIB_DIR` to override that root
-at runtime, for example when using a staged or custom installation.
+`public/...` imports resolve beneath the standard-library root configured at
+build time, normally `$(PREFIX)/share/lowc` (by default
+`/usr/local/share/lowc`). Set `LOWC_STDLIB_DIR` at runtime to use a different
+root without rebuilding the compiler. `make install` copies bundled standard
+library files to the selected prefix and overwrites files with matching names.
+To replace a bundled module with a custom version, install first, then copy
+your version over the corresponding file in `share/lowc/public`.
 
 ## Formatting
 
