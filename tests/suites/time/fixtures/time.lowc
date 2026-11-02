@@ -1,0 +1,114 @@
+import public/time.lowc : TimeSpec, time_monotonic_ns, time_wall_clock,
+    time_sleep, time_format_rfc3339_utc;
+
+s8 __time_test_equal(u1* left, u1* right, u8 length) {
+        u8 index = 0;
+
+        for (index = 0; index < length; index = index + 1) {
+                if (left[index] != right[index]) {
+                        return 0;
+                }
+        }
+
+        return 1;
+}
+
+u8 time_module_test(void) {
+        struct TimeSpec current = 0;
+        struct TimeSpec value   = 0;
+        u1 buffer[31]           = 0;
+        s8 before               = 0;
+        s8 after                = 0;
+        s8 result               = 0;
+        u8 index                = 0;
+
+        if (time_wall_clock(&current) != 0 || current.seconds < 0 ||
+            current.nanoseconds < 0 || current.nanoseconds >= 1000000000) {
+                return 1;
+        }
+
+        before = time_monotonic_ns();
+        if (before < 0) {
+                return 2;
+        }
+        if (time_sleep(0, 1000000) != 0) {
+                return 3;
+        }
+        after = time_monotonic_ns();
+        if (after < before) {
+                return 4;
+        }
+        if (time_sleep(-1, 0) != -22 || time_sleep(0, 1000000000) != -22 ||
+            time_sleep(0, -1) != -22) {
+                return 5;
+        }
+
+        for (index = 0; index < 31; index = index + 1) {
+                buffer[index] = 165;
+        }
+        value.seconds     = 0;
+        value.nanoseconds = 7;
+        result            = time_format_rfc3339_utc(&value, &buffer[0], 31);
+        if (result != 30 ||
+            !__time_test_equal(&buffer[0], "1970-01-01T00:00:00.000000007Z",
+                               30) ||
+            buffer[30] != 165) {
+                return 6;
+        }
+
+        value.seconds     = -1;
+        value.nanoseconds = 999999999;
+        if (time_format_rfc3339_utc(&value, &buffer[0], 30) != 30 ||
+            !__time_test_equal(&buffer[0], "1969-12-31T23:59:59.999999999Z",
+                               30)) {
+                return 7;
+        }
+
+        value.seconds     = 951782400;
+        value.nanoseconds = 0;
+        if (time_format_rfc3339_utc(&value, &buffer[0], 30) != 30 ||
+            !__time_test_equal(&buffer[0], "2000-02-29T00:00:00.000000000Z",
+                               30)) {
+                return 8;
+        }
+
+        value.seconds     = -62167219200;
+        value.nanoseconds = 0;
+        if (time_format_rfc3339_utc(&value, &buffer[0], 30) != 30 ||
+            !__time_test_equal(&buffer[0], "0000-01-01T00:00:00.000000000Z",
+                               30)) {
+                return 9;
+        }
+
+        value.seconds     = 253402300799;
+        value.nanoseconds = 999999999;
+        if (time_format_rfc3339_utc(&value, &buffer[0], 30) != 30 ||
+            !__time_test_equal(&buffer[0], "9999-12-31T23:59:59.999999999Z",
+                               30)) {
+                return 10;
+        }
+
+        value.seconds     = 0;
+        value.nanoseconds = -1;
+        if (time_format_rfc3339_utc(&value, &buffer[0], 30) != -22) {
+                return 11;
+        }
+        value.nanoseconds = 1000000000;
+        if (time_format_rfc3339_utc(&value, &buffer[0], 30) != -22) {
+                return 12;
+        }
+        value.nanoseconds = 0;
+        if (time_format_rfc3339_utc(&value, &buffer[0], 29) != -28) {
+                return 13;
+        }
+        value.seconds = 253402300800;
+        if (time_format_rfc3339_utc(&value, &buffer[0], 30) != -34) {
+                return 14;
+        }
+        value.seconds = -62167219201;
+        if (time_format_rfc3339_utc(&value, &buffer[0], 30) != -34) {
+                return 15;
+        }
+
+        return 0;
+}

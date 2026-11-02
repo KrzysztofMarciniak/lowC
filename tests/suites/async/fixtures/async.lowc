@@ -1,0 +1,115 @@
+import public/async.lowc : AsyncPollFd, async_poll, async_event_readable,
+        async_event_invalid;
+
+foreign c s4 pipe(s4* descriptors);
+foreign c s8 write(s4 descriptor, u1* buffer, u8 length);
+foreign c s8 read(s4 descriptor, u1* buffer, u8 length);
+foreign c s4 close(s4 descriptor);
+
+s4 async_module_test(void) {
+        s4 first_pipe[2] = 0;
+        s4 second_pipe[2] = 0;
+        struct AsyncPollFd poll_descriptors[2] = 0;
+        u1 byte = 65;
+        s4 ready_count = 0;
+        s4 error_code = 0;
+        s8 io_result = 0;
+
+        if (pipe(&first_pipe[0]) != 0) {
+                return 1;
+        }
+        if (pipe(&second_pipe[0]) != 0) {
+                close(first_pipe[0]);
+                close(first_pipe[1]);
+                return 1;
+        }
+
+        poll_descriptors[0].descriptor = first_pipe[0];
+        poll_descriptors[0].events = async_event_readable();
+        poll_descriptors[0].returned_events = 0;
+        poll_descriptors[1].descriptor = second_pipe[0];
+        poll_descriptors[1].events = async_event_readable();
+        poll_descriptors[1].returned_events = 0;
+
+        (ready_count, error_code) = async_poll(&poll_descriptors[0], 2, 0);
+        if (error_code != 0 || ready_count != 0) {
+                close(first_pipe[0]);
+                close(first_pipe[1]);
+                close(second_pipe[0]);
+                close(second_pipe[1]);
+                return 2;
+        }
+
+        (ready_count, error_code) = async_poll(&poll_descriptors[0], 2, 10);
+        if (error_code != 0 || ready_count != 0) {
+                close(first_pipe[0]);
+                close(first_pipe[1]);
+                close(second_pipe[0]);
+                close(second_pipe[1]);
+                return 3;
+        }
+
+        io_result = write(second_pipe[1], &byte, 1);
+        if (io_result != 1) {
+                close(first_pipe[0]);
+                close(first_pipe[1]);
+                close(second_pipe[0]);
+                close(second_pipe[1]);
+                return 4;
+        }
+
+        (ready_count, error_code) = async_poll(&poll_descriptors[0], 2, 1000);
+        if (error_code != 0 || ready_count != 1 ||
+            poll_descriptors[0].returned_events != 0 ||
+            poll_descriptors[1].returned_events != async_event_readable()) {
+                close(first_pipe[0]);
+                close(first_pipe[1]);
+                close(second_pipe[0]);
+                close(second_pipe[1]);
+                return 5;
+        }
+
+        io_result = read(second_pipe[0], &byte, 1);
+        if (io_result != 1 || byte != 65) {
+                close(first_pipe[0]);
+                close(first_pipe[1]);
+                close(second_pipe[0]);
+                close(second_pipe[1]);
+                return 6;
+        }
+
+        (ready_count, error_code) = async_poll(&poll_descriptors[0], 0, -2);
+        if (ready_count != 0 || error_code != -22) {
+                close(first_pipe[0]);
+                close(first_pipe[1]);
+                close(second_pipe[0]);
+                close(second_pipe[1]);
+                return 7;
+        }
+
+        if (close(first_pipe[0]) != 0) {
+                close(first_pipe[1]);
+                close(second_pipe[0]);
+                close(second_pipe[1]);
+                return 8;
+        }
+
+        poll_descriptors[0].descriptor = first_pipe[0];
+        poll_descriptors[0].events = 0;
+        poll_descriptors[0].returned_events = 0;
+        poll_descriptors[1].returned_events = 0;
+        (ready_count, error_code) = async_poll(&poll_descriptors[0], 2, 1000);
+        if (error_code != 0 || ready_count != 1 ||
+            poll_descriptors[0].returned_events != async_event_invalid() ||
+            poll_descriptors[1].returned_events != 0) {
+                close(first_pipe[1]);
+                close(second_pipe[0]);
+                close(second_pipe[1]);
+                return 9;
+        }
+
+        close(first_pipe[1]);
+        close(second_pipe[0]);
+        close(second_pipe[1]);
+        return 0;
+}

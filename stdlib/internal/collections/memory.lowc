@@ -1,0 +1,56 @@
+s8 __lowc_collections_alloc(u8 size, void** output) {
+        s8 result             = 0;
+        u1* base              = 0;
+        u8 allocation_size    = 0;
+        void* header_address  = 0;
+        void* empty            = 0;
+        u8* header            = 0;
+
+        *output = empty;
+        if (size > 9223372036854775799) {
+                return -75;
+        }
+        if (size == 0) {
+                size = 1;
+        }
+
+        allocation_size = size + 8;
+        asm("syscall"
+            : "=rax"(result)
+            : "rax"(9), "rdi"(0), "rsi"(allocation_size), "rdx"(3), "r10"(34),
+              "r8"(-1), "r9"(0)
+            : "rdi", "rcx", "r11", "memory", "cc");
+        if (result < 0) {
+                return result;
+        }
+
+        asm("mov %0, rax"
+            : "=rax"(base)
+            : "rax"(result)
+            :);
+        header_address = base;
+        header = header_address;
+        *header = allocation_size;
+        *output = base + 8;
+        return 0;
+}
+
+s8 __lowc_collections_free(void* data) {
+        s8 result           = 0;
+        u1* bytes           = 0;
+        u1* base            = 0;
+        void* header_address = 0;
+        u8* header          = 0;
+        u8 allocation_size  = 0;
+
+        bytes = data;
+        base = bytes - 8;
+        header_address = base;
+        header = header_address;
+        allocation_size = *header;
+        asm("syscall"
+            : "=rax"(result)
+            : "rax"(11), "rdi"(base), "rsi"(allocation_size)
+            : "rcx", "r11", "memory", "cc");
+        return result;
+}

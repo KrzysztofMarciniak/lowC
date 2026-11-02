@@ -1,0 +1,276 @@
+u8 __lowc_path_length(u1 *text) {
+    u8 length = 0;
+
+    for (; text[length] != 0; length = length + 1) {
+    }
+
+    return length;
+}
+
+s8 __lowc_path_copy(u1 *output, u8 capacity, u8 *length, u1 value) {
+    if (*length + 1 >= capacity) {
+        return -36;
+    }
+
+    output[*length] = value;
+    *length = *length + 1;
+    output[*length] = 0;
+    return 0;
+}
+
+// Output buffers are caller-owned, capacity includes the NUL, and must not
+// overlap input strings. Success returns bytes written (excluding the NUL).
+s8 path_join(u1 *left, u1 *right, u1 *output, u8 capacity) {
+    u8 left_length = 0;
+    u8 right_length = 0;
+    u8 index = 0;
+    u8 length = 0;
+    s8 result = 0;
+    u1 *null_pointer = 0;
+
+    if (left == null_pointer || right == null_pointer ||
+        output == null_pointer) {
+        return -22;
+    }
+    if (capacity == 0) {
+        return -36;
+    }
+    output[0] = 0;
+    right_length = __lowc_path_length(right);
+
+    if (right_length > 0 && right[0] == 47) {
+        for (index = 0; index < right_length; index = index + 1) {
+            result = __lowc_path_copy(output, capacity, &length, right[index]);
+            if (result < 0) {
+                return result;
+            }
+        }
+        return length;
+    }
+
+    left_length = __lowc_path_length(left);
+    for (index = 0; index < left_length; index = index + 1) {
+        result = __lowc_path_copy(output, capacity, &length, left[index]);
+        if (result < 0) {
+            return result;
+        }
+    }
+    if (left_length > 0 && right_length > 0 &&
+        left[left_length - 1] != 47) {
+        result = __lowc_path_copy(output, capacity, &length, 47);
+        if (result < 0) {
+            return result;
+        }
+    }
+    for (index = 0; index < right_length; index = index + 1) {
+        result = __lowc_path_copy(output, capacity, &length, right[index]);
+        if (result < 0) {
+            return result;
+        }
+    }
+
+    return length;
+}
+
+s8 path_basename(u1 *path, u1 *output, u8 capacity) {
+    u8 length = 0;
+    u8 start = 0;
+    u8 end = 0;
+    u8 index = 0;
+    s8 result = 0;
+    u1 *null_pointer = 0;
+
+    if (path == null_pointer || output == null_pointer) {
+        return -22;
+    }
+    if (capacity == 0) {
+        return -36;
+    }
+    output[0] = 0;
+    length = __lowc_path_length(path);
+    end = length;
+
+    for (; end > 0 && path[end - 1] == 47;) {
+        end = end - 1;
+    }
+    if (end == 0) {
+        if (length > 0 && path[0] == 47) {
+            result = __lowc_path_copy(output, capacity, &index, 47);
+            if (result < 0) {
+                return result;
+            }
+            return index;
+        }
+        result = __lowc_path_copy(output, capacity, &index, 46);
+        if (result < 0) {
+            return result;
+        }
+        return index;
+    }
+
+    start = end;
+    for (; start > 0 && path[start - 1] != 47;) {
+        start = start - 1;
+    }
+    length = 0;
+    for (index = start; index < end; index = index + 1) {
+        result = __lowc_path_copy(output, capacity, &length, path[index]);
+        if (result < 0) {
+            return result;
+        }
+    }
+    return length;
+}
+
+s8 path_dirname(u1 *path, u1 *output, u8 capacity) {
+    u8 length = 0;
+    u8 end = 0;
+    u8 index = 0;
+    s8 result = 0;
+    u1 *null_pointer = 0;
+
+    if (path == null_pointer || output == null_pointer) {
+        return -22;
+    }
+    if (capacity == 0) {
+        return -36;
+    }
+    output[0] = 0;
+    length = __lowc_path_length(path);
+    end = length;
+    for (; end > 0 && path[end - 1] == 47;) {
+        end = end - 1;
+    }
+    for (; end > 0 && path[end - 1] != 47;) {
+        end = end - 1;
+    }
+    for (; end > 1 && path[end - 1] == 47;) {
+        end = end - 1;
+    }
+
+    if (end == 0) {
+        if (length > 0 && path[0] == 47) {
+            if (capacity < 2) {
+                return -36;
+            }
+            output[0] = 47;
+            output[1] = 0;
+            return 1;
+        }
+        output[0] = 46;
+        if (capacity < 2) {
+            return -36;
+        }
+        output[1] = 0;
+        return 1;
+    }
+    length = 0;
+    for (index = 0; index < end; index = index + 1) {
+        result = __lowc_path_copy(output, capacity, &length, path[index]);
+        if (result < 0) {
+            return result;
+        }
+    }
+    return length;
+}
+
+// Lexically normalizes components; it does not resolve symlinks or access disk.
+s8 path_normalize(u1 *path, u1 *output, u8 capacity) {
+    u8 input_length = 0;
+    u8 input_index = 0;
+    u8 output_length = 0;
+    u8 component_start = 0;
+    u8 component_length = 0;
+    u8 scan = 0;
+    u8 previous_start = 0;
+    u1 absolute = 0;
+    u1 skip_component = 0;
+    s8 result = 0;
+    u1 *null_pointer = 0;
+
+    if (path == null_pointer || output == null_pointer) {
+        return -22;
+    }
+    if (capacity == 0) {
+        return -36;
+    }
+    output[0] = 0;
+    input_length = __lowc_path_length(path);
+    absolute = input_length > 0 && path[0] == 47;
+    if (absolute) {
+        result = __lowc_path_copy(output, capacity, &output_length, 47);
+        if (result < 0) {
+            return result;
+        }
+    }
+
+    for (; input_index < input_length;) {
+        for (; input_index < input_length && path[input_index] == 47;) {
+            input_index = input_index + 1;
+        }
+        component_start = input_index;
+        for (; input_index < input_length && path[input_index] != 47;) {
+            input_index = input_index + 1;
+        }
+        component_length = input_index - component_start;
+        skip_component = 0;
+        if (component_length == 0 ||
+            (component_length == 1 && path[component_start] == 46)) {
+            skip_component = 1;
+        }
+        if (skip_component == 0 &&
+            component_length == 2 && path[component_start] == 46 &&
+            path[component_start + 1] == 46) {
+            if (output_length > 0 &&
+                !(absolute && output_length == 1)) {
+                scan = output_length;
+                for (; scan > 0 && output[scan - 1] != 47;) {
+                    scan = scan - 1;
+                }
+                previous_start = scan;
+                if (!(output_length - previous_start == 2 &&
+                      output[previous_start] == 46 &&
+                      output[previous_start + 1] == 46)) {
+                    output_length = previous_start;
+                    if (output_length > 0 && output[output_length - 1] == 47 &&
+                        !(absolute && output_length == 1)) {
+                        output_length = output_length - 1;
+                    }
+                    output[output_length] = 0;
+                    skip_component = 1;
+                }
+            }
+            if (absolute) {
+                skip_component = 1;
+            }
+        }
+        if (skip_component == 0 && output_length > 0 &&
+            output[output_length - 1] != 47) {
+            result = __lowc_path_copy(output, capacity, &output_length, 47);
+            if (result < 0) {
+                return result;
+            }
+        }
+        if (skip_component == 0) {
+            for (scan = 0; scan < component_length; scan = scan + 1) {
+                result = __lowc_path_copy(
+                    output,
+                    capacity,
+                    &output_length,
+                    path[component_start + scan]
+                );
+                if (result < 0) {
+                    return result;
+                }
+            }
+        }
+    }
+
+    if (output_length == 0) {
+        result = __lowc_path_copy(output, capacity, &output_length, 46);
+        if (result < 0) {
+            return result;
+        }
+    }
+    return output_length;
+}

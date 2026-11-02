@@ -1,6 +1,0 @@
-import visibility_module.lowc : exported_function;
-
-void entrypoint(void) {
-    dependency_value();
-    return;
-}

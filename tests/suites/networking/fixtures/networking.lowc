@@ -1,0 +1,140 @@
+import public/network.lowc : TcpConnection, UdpConnection, tcp_connect,
+    tcp_close, udp_connect, udp_send, udp_receive, udp_close,
+    udp_set_timeout;
+import public/http.lowc : HttpRequest, HttpResponse, http_request, http_get;
+import public/string.lowc : strcmp;
+
+u1 __networking_contains(u1 *text, u1 *needle) {
+    u8 text_index = 0;
+    u8 needle_index = 0;
+
+    for (; text[text_index] != 0; text_index = text_index + 1) {
+        needle_index = 0;
+        for (; needle[needle_index] != 0 &&
+             text[text_index + needle_index] == needle[needle_index];
+             needle_index = needle_index + 1) {
+        }
+        if (needle[needle_index] == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+u8 networking_extensions_test(u8 tcp_port, u8 udp_port) {
+    struct UdpConnection udp = 0;
+    struct HttpRequest request = 0;
+    struct HttpResponse response = 0;
+    u1 udp_body[8] = 0;
+    u1 body[64] = 0;
+    u1 headers[128] = 0;
+    u1 request_method[5] = 0;
+    u1 request_headers[16] = 0;
+    u1 request_body[5] = 0;
+    u1 empty_headers[1] = 0;
+    s4 status = 0;
+    s8 result = 0;
+
+    if (udp_connect("127.0.0.1", udp_port, &udp) != 0) {
+        return 1;
+    }
+    if (udp_set_timeout(&udp, 1000, 1000) != 0) {
+        return 2;
+    }
+    if (udp_send(&udp, "ping", 4) != 4) {
+        return 3;
+    }
+    result = udp_receive(&udp, &udp_body[0], 8);
+    if (result != 4 || udp_body[0] != 112 || udp_body[3] != 103) {
+        return 4;
+    }
+    if (udp_close(&udp) != 0 || udp_close(&udp) != -9) {
+        return 5;
+    }
+
+    (result, status) = http_get(
+        "127.0.0.1", tcp_port, "/old", &body[0], 64
+    );
+    if (result != 5 || status != 200) {
+        return 6;
+    }
+    body[result] = 0;
+    if (strcmp(&body[0], "hello") != 0) {
+        return 7;
+    }
+
+    request_method[0] = 80;
+    request_method[1] = 79;
+    request_method[2] = 83;
+    request_method[3] = 84;
+    request.path = "/chunk";
+    request.method = &request_method[0];
+    request_headers[0] = 88;
+    request_headers[1] = 45;
+    request_headers[2] = 84;
+    request_headers[3] = 101;
+    request_headers[4] = 115;
+    request_headers[5] = 116;
+    request_headers[6] = 58;
+    request_headers[7] = 32;
+    request_headers[8] = 121;
+    request_headers[9] = 101;
+    request_headers[10] = 115;
+    request_headers[11] = 13;
+    request_headers[12] = 10;
+    request.headers = &request_headers[0];
+    request_body[0] = 100;
+    request_body[1] = 97;
+    request_body[2] = 116;
+    request_body[3] = 97;
+    request.body = &request_body[0];
+    request.body_length = 4;
+    request.timeout_ms = 1000;
+    response.body = &body[0];
+    response.body_capacity = 64;
+    response.headers = &headers[0];
+    response.headers_capacity = 128;
+    result = http_request("127.0.0.1", tcp_port, &request, &response);
+    if (result != 9 || response.status_code != 201) {
+        return 8;
+    }
+    body[result] = 0;
+    if (strcmp(&body[0], "Wikipedia") != 0) {
+        return 9;
+    }
+    if (__networking_contains(&headers[0], "X-Reply: yes") == 0) {
+        return 10;
+    }
+
+    request_method[0] = 71;
+    request_method[1] = 69;
+    request_method[2] = 84;
+    request_method[3] = 0;
+    request.method = &request_method[0];
+    request.path = "/malformed";
+    request.headers = &empty_headers[0];
+    request.body_length = 0;
+    request.timeout_ms = 1000;
+    result = http_request("127.0.0.1", tcp_port, &request, &response);
+    if (result >= 0) {
+        return 11;
+    }
+    if (response.status_code != 200) {
+        return 14;
+    }
+
+    request.path = "/partial";
+    result = http_request("127.0.0.1", tcp_port, &request, &response);
+    if (result >= 0 || response.status_code != 200) {
+        return 12;
+    }
+
+    request.path = "/slow";
+    request.timeout_ms = 50;
+    result = http_request("127.0.0.1", tcp_port, &request, &response);
+    if (result >= 0 || response.status_code != 200) {
+        return 13;
+    }
+
+    return 0;
+}

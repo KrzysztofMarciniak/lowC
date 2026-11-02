@@ -1,0 +1,1083 @@
+
+import ../internal/collections/memory.lowc : __lowc_collections_alloc, __lowc_collections_free;
+
+// Instance and output pointers must be valid; operations return 0 or a negative errno.
+struct VectorU1 {
+        u1* data;
+        u8 size;
+        u8 capacity;
+};
+
+s8 __vector_u1_reserve(struct VectorU1* vector, u8 needed) {
+        u8 capacity = 0;
+        u8 maximum = 9223372036854775799 / 1;
+        u8 index = 0;
+        void* allocation = 0;
+        u1* new_data = 0;
+        s8 result = 0;
+
+        if (needed <= vector->capacity) {
+                return 0;
+        }
+        if (needed > maximum) {
+                return -75;
+        }
+        capacity = vector->capacity;
+        if (capacity == 0) {
+                capacity = 4;
+        }
+        for (; capacity < needed;) {
+                if (capacity > maximum / 2) {
+                        capacity = maximum;
+                } else {
+                        capacity = capacity * 2;
+                }
+        }
+        result = __lowc_collections_alloc(capacity * 1, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        new_data = allocation;
+        for (index = 0; index < vector->size; index = index + 1) {
+                new_data[index] = vector->data[index];
+        }
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                __lowc_collections_free(allocation);
+                return result;
+        }
+        vector->data = new_data;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_u1_init(struct VectorU1* vector, u8 capacity) {
+        u1* empty = 0;
+        void* allocation = 0;
+        s8 result = 0;
+
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        if (capacity > 9223372036854775799 / 1) {
+                return -75;
+        }
+        if (capacity == 0) {
+                return 0;
+        }
+        result = __lowc_collections_alloc(capacity * 1, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        vector->data = allocation;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_u1_push(struct VectorU1* vector, u1 value) {
+        s8 result = 0;
+
+        if (vector->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __vector_u1_reserve(vector, vector->size + 1);
+        if (result < 0) {
+                return result;
+        }
+        vector->data[vector->size] = value;
+        vector->size = vector->size + 1;
+        return 0;
+}
+
+s8 vector_u1_get(struct VectorU1* vector, u8 index, u1* value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        return 0;
+}
+
+s8 vector_u1_set(struct VectorU1* vector, u8 index, u1 value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        vector->data[index] = value;
+        return 0;
+}
+
+s8 vector_u1_remove(struct VectorU1* vector, u8 index, u1* value) {
+        u8 cursor = 0;
+
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        for (cursor = index; cursor + 1 < vector->size; cursor = cursor + 1) {
+                vector->data[cursor] = vector->data[cursor + 1];
+        }
+        vector->size = vector->size - 1;
+        return 0;
+}
+
+s8 vector_u1_deinit(struct VectorU1* vector) {
+        u1* empty = 0;
+        s8 result = 0;
+
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                return result;
+        }
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        return 0;
+}
+
+struct VectorU2 {
+        u2* data;
+        u8 size;
+        u8 capacity;
+};
+
+s8 __vector_u2_reserve(struct VectorU2* vector, u8 needed) {
+        u8 capacity = 0;
+        u8 maximum = 9223372036854775799 / 2;
+        u8 index = 0;
+        void* allocation = 0;
+        u2* new_data = 0;
+        s8 result = 0;
+
+        if (needed <= vector->capacity) {
+                return 0;
+        }
+        if (needed > maximum) {
+                return -75;
+        }
+        capacity = vector->capacity;
+        if (capacity == 0) {
+                capacity = 4;
+        }
+        for (; capacity < needed;) {
+                if (capacity > maximum / 2) {
+                        capacity = maximum;
+                } else {
+                        capacity = capacity * 2;
+                }
+        }
+        result = __lowc_collections_alloc(capacity * 2, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        new_data = allocation;
+        for (index = 0; index < vector->size; index = index + 1) {
+                new_data[index] = vector->data[index];
+        }
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                __lowc_collections_free(allocation);
+                return result;
+        }
+        vector->data = new_data;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_u2_init(struct VectorU2* vector, u8 capacity) {
+        u2* empty = 0;
+        void* allocation = 0;
+        s8 result = 0;
+
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        if (capacity > 9223372036854775799 / 2) {
+                return -75;
+        }
+        if (capacity == 0) {
+                return 0;
+        }
+        result = __lowc_collections_alloc(capacity * 2, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        vector->data = allocation;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_u2_push(struct VectorU2* vector, u2 value) {
+        s8 result = 0;
+
+        if (vector->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __vector_u2_reserve(vector, vector->size + 1);
+        if (result < 0) {
+                return result;
+        }
+        vector->data[vector->size] = value;
+        vector->size = vector->size + 1;
+        return 0;
+}
+
+s8 vector_u2_get(struct VectorU2* vector, u8 index, u2* value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        return 0;
+}
+
+s8 vector_u2_set(struct VectorU2* vector, u8 index, u2 value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        vector->data[index] = value;
+        return 0;
+}
+
+s8 vector_u2_remove(struct VectorU2* vector, u8 index, u2* value) {
+        u8 cursor = 0;
+
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        for (cursor = index; cursor + 1 < vector->size; cursor = cursor + 1) {
+                vector->data[cursor] = vector->data[cursor + 1];
+        }
+        vector->size = vector->size - 1;
+        return 0;
+}
+
+s8 vector_u2_deinit(struct VectorU2* vector) {
+        u2* empty = 0;
+        s8 result = 0;
+
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                return result;
+        }
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        return 0;
+}
+
+struct VectorU4 {
+        u4* data;
+        u8 size;
+        u8 capacity;
+};
+
+s8 __vector_u4_reserve(struct VectorU4* vector, u8 needed) {
+        u8 capacity = 0;
+        u8 maximum = 9223372036854775799 / 4;
+        u8 index = 0;
+        void* allocation = 0;
+        u4* new_data = 0;
+        s8 result = 0;
+
+        if (needed <= vector->capacity) {
+                return 0;
+        }
+        if (needed > maximum) {
+                return -75;
+        }
+        capacity = vector->capacity;
+        if (capacity == 0) {
+                capacity = 4;
+        }
+        for (; capacity < needed;) {
+                if (capacity > maximum / 2) {
+                        capacity = maximum;
+                } else {
+                        capacity = capacity * 2;
+                }
+        }
+        result = __lowc_collections_alloc(capacity * 4, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        new_data = allocation;
+        for (index = 0; index < vector->size; index = index + 1) {
+                new_data[index] = vector->data[index];
+        }
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                __lowc_collections_free(allocation);
+                return result;
+        }
+        vector->data = new_data;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_u4_init(struct VectorU4* vector, u8 capacity) {
+        u4* empty = 0;
+        void* allocation = 0;
+        s8 result = 0;
+
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        if (capacity > 9223372036854775799 / 4) {
+                return -75;
+        }
+        if (capacity == 0) {
+                return 0;
+        }
+        result = __lowc_collections_alloc(capacity * 4, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        vector->data = allocation;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_u4_push(struct VectorU4* vector, u4 value) {
+        s8 result = 0;
+
+        if (vector->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __vector_u4_reserve(vector, vector->size + 1);
+        if (result < 0) {
+                return result;
+        }
+        vector->data[vector->size] = value;
+        vector->size = vector->size + 1;
+        return 0;
+}
+
+s8 vector_u4_get(struct VectorU4* vector, u8 index, u4* value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        return 0;
+}
+
+s8 vector_u4_set(struct VectorU4* vector, u8 index, u4 value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        vector->data[index] = value;
+        return 0;
+}
+
+s8 vector_u4_remove(struct VectorU4* vector, u8 index, u4* value) {
+        u8 cursor = 0;
+
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        for (cursor = index; cursor + 1 < vector->size; cursor = cursor + 1) {
+                vector->data[cursor] = vector->data[cursor + 1];
+        }
+        vector->size = vector->size - 1;
+        return 0;
+}
+
+s8 vector_u4_deinit(struct VectorU4* vector) {
+        u4* empty = 0;
+        s8 result = 0;
+
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                return result;
+        }
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        return 0;
+}
+
+struct VectorU8 {
+        u8* data;
+        u8 size;
+        u8 capacity;
+};
+
+s8 __vector_u8_reserve(struct VectorU8* vector, u8 needed) {
+        u8 capacity = 0;
+        u8 maximum = 9223372036854775799 / 8;
+        u8 index = 0;
+        void* allocation = 0;
+        u8* new_data = 0;
+        s8 result = 0;
+
+        if (needed <= vector->capacity) {
+                return 0;
+        }
+        if (needed > maximum) {
+                return -75;
+        }
+        capacity = vector->capacity;
+        if (capacity == 0) {
+                capacity = 4;
+        }
+        for (; capacity < needed;) {
+                if (capacity > maximum / 2) {
+                        capacity = maximum;
+                } else {
+                        capacity = capacity * 2;
+                }
+        }
+        result = __lowc_collections_alloc(capacity * 8, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        new_data = allocation;
+        for (index = 0; index < vector->size; index = index + 1) {
+                new_data[index] = vector->data[index];
+        }
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                __lowc_collections_free(allocation);
+                return result;
+        }
+        vector->data = new_data;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_u8_init(struct VectorU8* vector, u8 capacity) {
+        u8* empty = 0;
+        void* allocation = 0;
+        s8 result = 0;
+
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        if (capacity > 9223372036854775799 / 8) {
+                return -75;
+        }
+        if (capacity == 0) {
+                return 0;
+        }
+        result = __lowc_collections_alloc(capacity * 8, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        vector->data = allocation;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_u8_push(struct VectorU8* vector, u8 value) {
+        s8 result = 0;
+
+        if (vector->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __vector_u8_reserve(vector, vector->size + 1);
+        if (result < 0) {
+                return result;
+        }
+        vector->data[vector->size] = value;
+        vector->size = vector->size + 1;
+        return 0;
+}
+
+s8 vector_u8_get(struct VectorU8* vector, u8 index, u8* value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        return 0;
+}
+
+s8 vector_u8_set(struct VectorU8* vector, u8 index, u8 value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        vector->data[index] = value;
+        return 0;
+}
+
+s8 vector_u8_remove(struct VectorU8* vector, u8 index, u8* value) {
+        u8 cursor = 0;
+
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        for (cursor = index; cursor + 1 < vector->size; cursor = cursor + 1) {
+                vector->data[cursor] = vector->data[cursor + 1];
+        }
+        vector->size = vector->size - 1;
+        return 0;
+}
+
+s8 vector_u8_deinit(struct VectorU8* vector) {
+        u8* empty = 0;
+        s8 result = 0;
+
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                return result;
+        }
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        return 0;
+}
+
+struct VectorS1 {
+        s1* data;
+        u8 size;
+        u8 capacity;
+};
+
+s8 __vector_s1_reserve(struct VectorS1* vector, u8 needed) {
+        u8 capacity = 0;
+        u8 maximum = 9223372036854775799 / 1;
+        u8 index = 0;
+        void* allocation = 0;
+        s1* new_data = 0;
+        s8 result = 0;
+
+        if (needed <= vector->capacity) {
+                return 0;
+        }
+        if (needed > maximum) {
+                return -75;
+        }
+        capacity = vector->capacity;
+        if (capacity == 0) {
+                capacity = 4;
+        }
+        for (; capacity < needed;) {
+                if (capacity > maximum / 2) {
+                        capacity = maximum;
+                } else {
+                        capacity = capacity * 2;
+                }
+        }
+        result = __lowc_collections_alloc(capacity * 1, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        new_data = allocation;
+        for (index = 0; index < vector->size; index = index + 1) {
+                new_data[index] = vector->data[index];
+        }
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                __lowc_collections_free(allocation);
+                return result;
+        }
+        vector->data = new_data;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_s1_init(struct VectorS1* vector, u8 capacity) {
+        s1* empty = 0;
+        void* allocation = 0;
+        s8 result = 0;
+
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        if (capacity > 9223372036854775799 / 1) {
+                return -75;
+        }
+        if (capacity == 0) {
+                return 0;
+        }
+        result = __lowc_collections_alloc(capacity * 1, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        vector->data = allocation;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_s1_push(struct VectorS1* vector, s1 value) {
+        s8 result = 0;
+
+        if (vector->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __vector_s1_reserve(vector, vector->size + 1);
+        if (result < 0) {
+                return result;
+        }
+        vector->data[vector->size] = value;
+        vector->size = vector->size + 1;
+        return 0;
+}
+
+s8 vector_s1_get(struct VectorS1* vector, u8 index, s1* value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        return 0;
+}
+
+s8 vector_s1_set(struct VectorS1* vector, u8 index, s1 value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        vector->data[index] = value;
+        return 0;
+}
+
+s8 vector_s1_remove(struct VectorS1* vector, u8 index, s1* value) {
+        u8 cursor = 0;
+
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        for (cursor = index; cursor + 1 < vector->size; cursor = cursor + 1) {
+                vector->data[cursor] = vector->data[cursor + 1];
+        }
+        vector->size = vector->size - 1;
+        return 0;
+}
+
+s8 vector_s1_deinit(struct VectorS1* vector) {
+        s1* empty = 0;
+        s8 result = 0;
+
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                return result;
+        }
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        return 0;
+}
+
+struct VectorS2 {
+        s2* data;
+        u8 size;
+        u8 capacity;
+};
+
+s8 __vector_s2_reserve(struct VectorS2* vector, u8 needed) {
+        u8 capacity = 0;
+        u8 maximum = 9223372036854775799 / 2;
+        u8 index = 0;
+        void* allocation = 0;
+        s2* new_data = 0;
+        s8 result = 0;
+
+        if (needed <= vector->capacity) {
+                return 0;
+        }
+        if (needed > maximum) {
+                return -75;
+        }
+        capacity = vector->capacity;
+        if (capacity == 0) {
+                capacity = 4;
+        }
+        for (; capacity < needed;) {
+                if (capacity > maximum / 2) {
+                        capacity = maximum;
+                } else {
+                        capacity = capacity * 2;
+                }
+        }
+        result = __lowc_collections_alloc(capacity * 2, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        new_data = allocation;
+        for (index = 0; index < vector->size; index = index + 1) {
+                new_data[index] = vector->data[index];
+        }
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                __lowc_collections_free(allocation);
+                return result;
+        }
+        vector->data = new_data;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_s2_init(struct VectorS2* vector, u8 capacity) {
+        s2* empty = 0;
+        void* allocation = 0;
+        s8 result = 0;
+
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        if (capacity > 9223372036854775799 / 2) {
+                return -75;
+        }
+        if (capacity == 0) {
+                return 0;
+        }
+        result = __lowc_collections_alloc(capacity * 2, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        vector->data = allocation;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_s2_push(struct VectorS2* vector, s2 value) {
+        s8 result = 0;
+
+        if (vector->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __vector_s2_reserve(vector, vector->size + 1);
+        if (result < 0) {
+                return result;
+        }
+        vector->data[vector->size] = value;
+        vector->size = vector->size + 1;
+        return 0;
+}
+
+s8 vector_s2_get(struct VectorS2* vector, u8 index, s2* value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        return 0;
+}
+
+s8 vector_s2_set(struct VectorS2* vector, u8 index, s2 value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        vector->data[index] = value;
+        return 0;
+}
+
+s8 vector_s2_remove(struct VectorS2* vector, u8 index, s2* value) {
+        u8 cursor = 0;
+
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        for (cursor = index; cursor + 1 < vector->size; cursor = cursor + 1) {
+                vector->data[cursor] = vector->data[cursor + 1];
+        }
+        vector->size = vector->size - 1;
+        return 0;
+}
+
+s8 vector_s2_deinit(struct VectorS2* vector) {
+        s2* empty = 0;
+        s8 result = 0;
+
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                return result;
+        }
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        return 0;
+}
+
+struct VectorS4 {
+        s4* data;
+        u8 size;
+        u8 capacity;
+};
+
+s8 __vector_s4_reserve(struct VectorS4* vector, u8 needed) {
+        u8 capacity = 0;
+        u8 maximum = 9223372036854775799 / 4;
+        u8 index = 0;
+        void* allocation = 0;
+        s4* new_data = 0;
+        s8 result = 0;
+
+        if (needed <= vector->capacity) {
+                return 0;
+        }
+        if (needed > maximum) {
+                return -75;
+        }
+        capacity = vector->capacity;
+        if (capacity == 0) {
+                capacity = 4;
+        }
+        for (; capacity < needed;) {
+                if (capacity > maximum / 2) {
+                        capacity = maximum;
+                } else {
+                        capacity = capacity * 2;
+                }
+        }
+        result = __lowc_collections_alloc(capacity * 4, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        new_data = allocation;
+        for (index = 0; index < vector->size; index = index + 1) {
+                new_data[index] = vector->data[index];
+        }
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                __lowc_collections_free(allocation);
+                return result;
+        }
+        vector->data = new_data;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_s4_init(struct VectorS4* vector, u8 capacity) {
+        s4* empty = 0;
+        void* allocation = 0;
+        s8 result = 0;
+
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        if (capacity > 9223372036854775799 / 4) {
+                return -75;
+        }
+        if (capacity == 0) {
+                return 0;
+        }
+        result = __lowc_collections_alloc(capacity * 4, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        vector->data = allocation;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_s4_push(struct VectorS4* vector, s4 value) {
+        s8 result = 0;
+
+        if (vector->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __vector_s4_reserve(vector, vector->size + 1);
+        if (result < 0) {
+                return result;
+        }
+        vector->data[vector->size] = value;
+        vector->size = vector->size + 1;
+        return 0;
+}
+
+s8 vector_s4_get(struct VectorS4* vector, u8 index, s4* value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        return 0;
+}
+
+s8 vector_s4_set(struct VectorS4* vector, u8 index, s4 value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        vector->data[index] = value;
+        return 0;
+}
+
+s8 vector_s4_remove(struct VectorS4* vector, u8 index, s4* value) {
+        u8 cursor = 0;
+
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        for (cursor = index; cursor + 1 < vector->size; cursor = cursor + 1) {
+                vector->data[cursor] = vector->data[cursor + 1];
+        }
+        vector->size = vector->size - 1;
+        return 0;
+}
+
+s8 vector_s4_deinit(struct VectorS4* vector) {
+        s4* empty = 0;
+        s8 result = 0;
+
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                return result;
+        }
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        return 0;
+}
+
+struct VectorS8 {
+        s8* data;
+        u8 size;
+        u8 capacity;
+};
+
+s8 __vector_s8_reserve(struct VectorS8* vector, u8 needed) {
+        u8 capacity = 0;
+        u8 maximum = 9223372036854775799 / 8;
+        u8 index = 0;
+        void* allocation = 0;
+        s8* new_data = 0;
+        s8 result = 0;
+
+        if (needed <= vector->capacity) {
+                return 0;
+        }
+        if (needed > maximum) {
+                return -75;
+        }
+        capacity = vector->capacity;
+        if (capacity == 0) {
+                capacity = 4;
+        }
+        for (; capacity < needed;) {
+                if (capacity > maximum / 2) {
+                        capacity = maximum;
+                } else {
+                        capacity = capacity * 2;
+                }
+        }
+        result = __lowc_collections_alloc(capacity * 8, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        new_data = allocation;
+        for (index = 0; index < vector->size; index = index + 1) {
+                new_data[index] = vector->data[index];
+        }
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                __lowc_collections_free(allocation);
+                return result;
+        }
+        vector->data = new_data;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_s8_init(struct VectorS8* vector, u8 capacity) {
+        s8* empty = 0;
+        void* allocation = 0;
+        s8 result = 0;
+
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        if (capacity > 9223372036854775799 / 8) {
+                return -75;
+        }
+        if (capacity == 0) {
+                return 0;
+        }
+        result = __lowc_collections_alloc(capacity * 8, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        vector->data = allocation;
+        vector->capacity = capacity;
+        return 0;
+}
+
+s8 vector_s8_push(struct VectorS8* vector, s8 value) {
+        s8 result = 0;
+
+        if (vector->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __vector_s8_reserve(vector, vector->size + 1);
+        if (result < 0) {
+                return result;
+        }
+        vector->data[vector->size] = value;
+        vector->size = vector->size + 1;
+        return 0;
+}
+
+s8 vector_s8_get(struct VectorS8* vector, u8 index, s8* value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        return 0;
+}
+
+s8 vector_s8_set(struct VectorS8* vector, u8 index, s8 value) {
+        if (index >= vector->size) {
+                return -34;
+        }
+        vector->data[index] = value;
+        return 0;
+}
+
+s8 vector_s8_remove(struct VectorS8* vector, u8 index, s8* value) {
+        u8 cursor = 0;
+
+        if (index >= vector->size) {
+                return -34;
+        }
+        *value = vector->data[index];
+        for (cursor = index; cursor + 1 < vector->size; cursor = cursor + 1) {
+                vector->data[cursor] = vector->data[cursor + 1];
+        }
+        vector->size = vector->size - 1;
+        return 0;
+}
+
+s8 vector_s8_deinit(struct VectorS8* vector) {
+        s8* empty = 0;
+        s8 result = 0;
+
+        if (vector->capacity != 0) {
+                result = __lowc_collections_free(vector->data);
+        }
+        if (result < 0) {
+                return result;
+        }
+        vector->data = empty;
+        vector->size = 0;
+        vector->capacity = 0;
+        return 0;
+}

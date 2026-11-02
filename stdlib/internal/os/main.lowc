@@ -1,0 +1,84 @@
+struct __LowcLinuxTimespec {
+    s8 seconds;
+    s8 nanoseconds;
+};
+
+struct __LowcLinuxStat {
+    u8 device;
+    u8 inode;
+    u8 links;
+    u4 mode;
+    u4 user_id;
+    u4 group_id;
+    u4 padding;
+    u8 special_device;
+    s8 size;
+    s8 block_size;
+    s8 blocks;
+    struct __LowcLinuxTimespec access_time;
+    struct __LowcLinuxTimespec modification_time;
+    struct __LowcLinuxTimespec change_time;
+    s8 reserved[3];
+};
+
+s8 __lowc_os_file_stat(
+    u1 *path,
+    s8 *size,
+    u4 *mode,
+    s8 *modified_seconds
+) {
+    struct __LowcLinuxStat metadata = 0;
+    s4 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(262), "rdi"(-100), "rsi"(path), "rdx"(&metadata), "r10"(0)
+        : "rcx", "r11", "memory", "cc");
+    if (result < 0) return result;
+
+    *size = metadata.size;
+    *mode = metadata.mode;
+    *modified_seconds = metadata.modification_time.seconds;
+    return 0;
+}
+
+s8 __lowc_os_directory_create(u1 *path, u4 mode) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(258), "rdi"(-100), "rsi"(path), "rdx"(mode)
+        : "rcx", "r11", "memory", "cc");
+    return result;
+}
+
+s8 __lowc_os_directory_remove(u1 *path) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(263), "rdi"(-100), "rsi"(path), "rdx"(512)
+        : "rcx", "r11", "memory", "cc");
+    return result;
+}
+
+s8 __lowc_os_getcwd(u1 *buffer, u8 capacity) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(79), "rdi"(buffer), "rsi"(capacity)
+        : "rcx", "r11", "memory", "cc");
+    if (result < 0) return result;
+    return 0;
+}
+
+s8 __lowc_os_chdir(u1 *path) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(80), "rdi"(path)
+        : "rcx", "r11", "memory", "cc");
+    return result;
+}

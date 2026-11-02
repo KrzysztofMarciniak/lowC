@@ -1,6 +1,6 @@
 # lowC
 
-**Version 3.0**
+**Version 3.1**
 
 A small C-like systems language and compiler.
 
@@ -82,24 +82,14 @@ Use `make portable` to build a statically linked Linux executable at
 Release builds favor a smaller executable and remain portable across x86-64
 CPUs; no host-specific instruction set is enabled.
 
-### A complete lowC program
-
-Save this as `hello.lowc`. The comments point out several rules that differ
-from the usual C entrypoint and variable conventions:
+### Hello, World!
 
 ```c
-foreign c s4 puts(u1 *text); // Declare a C-ABI-compatible signature for puts.
+import public/print.lowc : print;
 
-s8 add(s8 left, s8 right) {
-    return left + right; // Value-returning functions return explicitly.
-}
-
-void entrypoint(void) { // lowC executables begin here, not in main().
-    s8 answer = add(20, 22); // Every variable needs an initializer.
-    if (answer == 42) {
-        puts("The answer is 42");
-    }
-    return; // Even void functions explicitly return.
+void entrypoint(void) { 
+	print("Hello, World\n");
+	return;
 }
 ```
 
@@ -109,17 +99,6 @@ Compile and run it:
 build/lowc -o hello hello.lowc
 ./hello
 ```
-
-Expected output:
-
-```text
-The answer is 42
-```
-
-`puts` is provided by the C library. lowC does not parse C headers; the
-`foreign c` declaration tells the compiler the return type, parameter types,
-and C calling convention for this call. Pointer `const` qualifiers are not
-expressed by lowC's current type syntax.
 
 ### Call a function from your own C file
 
@@ -264,19 +243,19 @@ Executable output is assembled and linked with the system C compiler driver
 define exactly one `void entrypoint(void)`. The compiler supplies the platform
 `main` wrapper.
 
-Build the compiler and run the compiler and generated-code checks with:
+Run the compiler and generated-code checks with:
 
 ```sh
 make test
-make test TEST=optimization
+make test TEST=frontend
 ```
 
 The suite parses and assembles every smoke example, then runs focused test
-areas. Use `TEST=smoke`, `TEST=frontend`, `TEST=modules`, `TEST=optimization`,
-`TEST=semantic`, `TEST=standard_library`, or `TEST=inline_asm` to run one area.
+areas. Set `TEST` to `all`, `smoke`, `async`, `frontend`, `modules`, `optimization`,
+`semantic`, `standard-library`, or `inline-asm` to select an area.
 
-The top-level `tests/` tree separates compiler smoke inputs, shared fixtures,
-focused integration suites, and common Bash helpers.
+Smoke examples are in `tests/smoke/examples`; per-suite runners and fixtures
+are in `tests/suites/<suite>/`, with shared support in `tests/support/`.
 
 ## Practical examples
 
@@ -525,8 +504,8 @@ build/lowc -o fetch-page fetch-page.lowc
 ```
 
 The server's HTML is printed after the `HTTP status: 200` line. The standard
-library HTTP client supports plain HTTP only, not TLS, redirects, or chunked
-responses.
+library HTTP client supports plain HTTP and chunked response decoding, but not
+TLS or redirects.
 
 ## Motivation
 
@@ -982,6 +961,34 @@ retained. All declarations in explicitly supplied root source files are kept.
 
 ## Standard library
 
+### Asynchronous I/O readiness
+
+`public/async.lowc` provides `async_poll` for waiting on multiple file
+descriptors. It returns two values: the number of descriptors ready and an
+error code (zero on success, otherwise a negative OS error). A timeout of
+`-1` waits indefinitely; nonnegative timeouts are in milliseconds. Use the
+`async_event_*` functions for event masks; combine readable, priority, and
+writable masks by adding them. Error, hangup, and invalid-descriptor masks are
+returned automatically. When `count` is nonzero, the descriptor pointer must
+refer to an array of at least that many `AsyncPollFd` values. This is a Linux
+readiness-polling primitive, not language-level `async`/`await` or thread
+scheduling.
+
+```c
+import public/async.lowc : AsyncPollFd, async_poll, async_event_readable;
+
+u1 stdin_ready(void) {
+    struct AsyncPollFd descriptor = 0;
+    s4 ready_count = 0;
+    s4 error_code = 0;
+
+    descriptor.descriptor = 0;
+    descriptor.events = async_event_readable();
+    (ready_count, error_code) = async_poll(&descriptor, 1, 0);
+    return error_code == 0 && ready_count != 0;
+}
+```
+
 `make install` also installs public standard-library modules beneath
 `$(PREFIX)/share/lowc/public` (by default,
 `/usr/local/share/lowc/public`). Its `print.lowc` module provides string
@@ -1029,6 +1036,60 @@ void entrypoint(void) {
 `args_get(index)` returns `(false, 0)` for an out-of-range index. Returned
 strings are borrowed, NUL-terminated process arguments: do not modify or
 deallocate them. The startup bridge currently supports Linux x86-64.
+
+The `directory.lowc` module reads or changes the working directory and creates
+or removes directories. `working_directory_get` writes a NUL-terminated path
+into the supplied buffer and returns zero on success:
+
+```c
+import public/directory.lowc : working_directory_get, directory_create,
+    directory_remove;
+
+s8 directory_example(void) {
+    u1 current_directory[256] = 0;
+    s8 result = working_directory_get(&current_directory[0], 256);
+    if (result != 0) {
+        return result;
+    }
+
+    result = directory_create("lowc-example-dir", 493);
+    if (result != 0) {
+        return result;
+    }
+    return directory_remove("lowc-example-dir");
+}
+```
+
+The mode `493` is decimal `0755`; the process umask may further restrict it.
+Directory and working-directory system-call failures are returned as negative
+OS error codes.
+
+The `env.lowc` module gets, sets, and removes environment variables:
+
+```c
+import public/env.lowc : env_get, env_set, env_unset;
+import public/string.lowc : strcmp;
+
+s8 environment_example(void) {
+    u1 found = 0;
+    u1 *value = 0;
+    s8 result = env_set("LOWC_README_DEMO", "ready", 1);
+    if (result != 0) {
+        return result;
+    }
+
+    (found, value) = env_get("LOWC_README_DEMO");
+    if (!found || strcmp(value, "ready") != 0) {
+        env_unset("LOWC_README_DEMO");
+        return -1;
+    }
+    return env_unset("LOWC_README_DEMO");
+}
+```
+
+`env_get` returns `(found, value)`. The returned value is borrowed from the
+process environment; do not modify or deallocate it. `env_set` and `env_unset`
+return zero on success or a negative error code.
 
 String literals evaluate to `u1 *` and are stored as read-only byte data. The
 public `print` function calculates their length with the public `strlen`
@@ -1132,6 +1193,86 @@ load reaches 75%. Keys and values are unsigned 64-bit integers; `hashmap_remove`
 marks removed slots for reuse, and `hashmap_deinit` releases the map's backing
 allocations. Do not use the map after deinitializing it.
 
+The `vector.lowc` module provides resizable arrays for all eight integer types.
+This `s8` example pushes, reads, and releases a vector:
+
+```c
+import public/vector.lowc : VectorS8, vector_s8_init, vector_s8_push,
+    vector_s8_get, vector_s8_deinit;
+
+u1 vector_example(void) {
+    struct VectorS8 values = 0;
+    s8 value = 0;
+
+    if (vector_s8_init(&values, 0) != 0 ||
+        vector_s8_push(&values, 42) != 0 ||
+        vector_s8_get(&values, 0, &value) != 0) {
+        vector_s8_deinit(&values);
+        return 0;
+    }
+
+    vector_s8_deinit(&values);
+    return value == 42;
+}
+```
+
+`vector_<type>_init` accepts an initial capacity, `push` grows as needed, and
+`get`, `set`, and `remove` return a negative error for an invalid index.
+Always call `vector_<type>_deinit` when finished.
+
+The `list.lowc` module provides singly linked lists for the same integer
+types. This example appends two values and reads the second:
+
+```c
+import public/list.lowc : ListS8, list_s8_init, list_s8_append,
+    list_s8_get, list_s8_deinit;
+
+u1 list_example(void) {
+    struct ListS8 values = 0;
+    s8 value = 0;
+
+    if (list_s8_init(&values) != 0 ||
+        list_s8_append(&values, 10) != 0 ||
+        list_s8_append(&values, 20) != 0 ||
+        list_s8_get(&values, 1, &value) != 0) {
+        list_s8_deinit(&values);
+        return 0;
+    }
+
+    list_s8_deinit(&values);
+    return value == 20;
+}
+```
+
+`list_<type>_remove` removes an element by index and writes its value through
+an output pointer. Deinitialization releases every remaining node.
+
+The `set.lowc` module stores unique integer values:
+
+```c
+import public/set.lowc : SetU8, set_u8_init, set_u8_add, set_u8_contains,
+    set_u8_deinit;
+
+u1 set_example(void) {
+    struct SetU8 values = 0;
+    u1 contains = 0;
+
+    if (set_u8_init(&values, 0) != 0 ||
+        set_u8_add(&values, 42) != 1 ||
+        set_u8_contains(&values, 42, &contains) != 0) {
+        set_u8_deinit(&values);
+        return 0;
+    }
+
+    set_u8_deinit(&values);
+    return contains;
+}
+```
+
+`set_<type>_add` and `remove` return `1` when the set changes, `0` when it
+does not, or a negative error. `contains` writes its answer to an output
+pointer. The set implementations keep unique values and use contiguous storage.
+
 The `file.lowc` module provides descriptor-based file operations. Opening a
 file fills a `File` struct; read and write return the number of bytes
 transferred, zero from `file_read` means end-of-file, and `file_close` releases
@@ -1162,8 +1303,8 @@ operations return negative Linux `errno` values on failure; reads and writes
 may be partial, so loop when the full requested length is required. Close each
 successfully opened file once.
 
-The `network.lowc` module provides a hostname-resolving TCP client. A
-`TcpConnection` struct owns the connected socket:
+The `network.lowc` module provides hostname-resolving TCP and UDP clients. A
+`TcpConnection` struct owns the connected stream socket:
 
 ```c
 import public/network.lowc : TcpConnection, tcp_connect, tcp_send, tcp_receive, tcp_close;
@@ -1185,6 +1326,35 @@ s8 tcp_example(void) {
 receive closure, or a negative `errno`; handle partial sends when transmitting
 larger buffers. Resolver failures are returned as `-1000 - abs(EAI error)`.
 Call `tcp_close` once for every successful connection.
+
+The UDP API uses a connected datagram socket; set timeouts before receiving:
+
+```c
+import public/network.lowc : UdpConnection, udp_connect, udp_send,
+    udp_receive, udp_set_timeout, udp_close;
+
+s8 udp_example(void) {
+    struct UdpConnection connection = 0;
+    u1 response[64] = 0;
+    s8 result = udp_connect("127.0.0.1", 9000, &connection);
+    if (result != 0) {
+        return result;
+    }
+
+    result = udp_set_timeout(&connection, 1000, 1000);
+    if (result == 0) {
+        result = udp_send(&connection, "ping", 4);
+    }
+    if (result >= 0) {
+        result = udp_receive(&connection, &response[0], 64);
+    }
+    udp_close(&connection);
+    return result;
+}
+```
+
+`udp_send` and `udp_receive` operate on datagrams, while `tcp_set_timeout`
+and `udp_set_timeout` accept receive and send timeouts in milliseconds.
 
 The `http.lowc` module performs a basic plain-HTTP GET and writes the body to a
 caller-provided buffer:
@@ -1208,13 +1378,140 @@ s8 http_example(void) {
 }
 ```
 
-On success `http_get` returns `(body_length, status_code)`. On error the first
-value is negative and the status code is zero: `-20001` for malformed or
-incomplete headers, `-20002` when the body does not fit, `-20003` for an
-invalid host/path, `-20004` for a zero-byte request send, and `-20005` for
-chunked responses (which are not decoded). Network errors are propagated.
-This initial client uses plain HTTP only; it does not support TLS, redirects,
-proxies, or chunked transfer encoding.
+For other methods, request headers and bodies, use `http_request` directly:
+
+```c
+import public/http.lowc : HttpRequest, HttpResponse, http_request;
+
+s8 http_post_example(void) {
+    struct HttpRequest request = 0;
+    struct HttpResponse response = 0;
+    u1 response_body[1024] = 0;
+    u1 response_headers[4096] = 0;
+    s8 body_length = 0;
+
+    request.method = "POST";
+    request.path = "/submit";
+    request.headers = "Content-Type: application/x-www-form-urlencoded\r\n";
+    request.body = "name=lowC";
+    request.body_length = 9;
+    request.timeout_ms = 5000;
+    response.body = &response_body[0];
+    response.body_capacity = 1023;
+    response.headers = &response_headers[0];
+    response.headers_capacity = 4096;
+
+    body_length = http_request("127.0.0.1", 8080, &request, &response);
+    if (body_length < 0) {
+        return body_length;
+    }
+
+    response_body[body_length] = 0;
+    return response.status_code;
+}
+```
+
+`http_get` returns `(body_length, status_code)`; `http_request` returns the
+body length and writes the status and response headers to `HttpResponse`.
+Request headers are CRLF-separated lines, and the request body length is in
+bytes. Both APIs decode chunked response bodies. Errors include `-20001` for
+malformed or incomplete responses, `-20002` when the body does not fit,
+`-20003` for invalid request fields, `-20004` for a zero-byte request send,
+and `-20006` when response headers exceed the provided buffer or parser
+limit; network errors are propagated. The client supports plain HTTP only,
+not TLS, redirects, or proxies.
+
+The `path.lowc` module manipulates path strings without accessing the
+filesystem:
+
+```c
+import public/path.lowc : path_join, path_normalize;
+
+s8 path_example(u1 *output, u8 capacity) {
+    u1 joined[256] = 0;
+    s8 result = path_join("var", "logs/../app.log", &joined[0], 256);
+    if (result < 0) {
+        return result;
+    }
+    return path_normalize(&joined[0], output, capacity);
+}
+```
+
+`path_join`, `path_basename`, `path_dirname`, and `path_normalize` write
+NUL-terminated results to caller-owned buffers and return the byte length or a
+negative error. Capacity includes the terminating NUL. `path_normalize` is
+lexical; it does not resolve symlinks.
+
+The `process.lowc` module starts an executable directly, without invoking a
+shell. Its argument vector must be NUL-terminated:
+
+```c
+import public/process.lowc : Process, process_spawn, process_wait;
+
+s8 process_example(void) {
+    struct Process process = 0;
+    u1 *arguments[2] = 0;
+    u1 exited = 0;
+    s4 exit_code = -1;
+    s4 term_signal = 0;
+    s8 result = 0;
+
+    arguments[0] = "/usr/bin/true";
+    result = process_spawn("/usr/bin/true", &arguments[0], &process);
+    if (result != 0) {
+        return result;
+    }
+    result = process_wait(&process, &exited, &exit_code, &term_signal);
+    if (result != 0) {
+        return result;
+    }
+    return exited && exit_code == 0 && term_signal == 0;
+}
+```
+
+`process_spawn` returns after the child has successfully executed the program.
+`process_wait` blocks until it exits and reports either its exit code or
+terminating signal. Both functions return zero on success or a negative OS
+error.
+
+The `time.lowc` module provides monotonic time, wall-clock time, sleep, and
+UTC RFC 3339 formatting:
+
+```c
+import public/time.lowc : TimeSpec, time_monotonic_ns, time_wall_clock,
+    time_sleep, time_format_rfc3339_utc;
+import public/print.lowc : print;
+
+s8 time_example(void) {
+    struct TimeSpec now = 0;
+    u1 timestamp[31] = 0;
+    s8 result = time_monotonic_ns();
+    if (result < 0) {
+        return result;
+    }
+    result = time_wall_clock(&now);
+    if (result != 0) {
+        return result;
+    }
+    result = time_sleep(0, 1000000);
+    if (result != 0) {
+        return result;
+    }
+    result = time_format_rfc3339_utc(&now, &timestamp[0], 30);
+    if (result < 0) {
+        return result;
+    }
+    timestamp[30] = 0;
+    print(&timestamp[0]);
+    print("\n");
+    return 0;
+}
+```
+
+Monotonic time is returned in nanoseconds or as a negative OS error.
+`TimeSpec` stores seconds and nanoseconds; wall-clock and sleep calls return
+zero or a negative error. Formatting writes 30 bytes without a terminator, so
+reserve and append the 31st byte as shown.
 
 `public/...` imports resolve beneath the standard-library root configured at
 build time, normally `$(PREFIX)/share/lowc` (by default

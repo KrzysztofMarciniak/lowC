@@ -1,0 +1,420 @@
+import public/vector.lowc : VectorU1, vector_u1_init, vector_u1_push, vector_u1_get, vector_u1_set, vector_u1_remove, vector_u1_deinit,
+    VectorU2, vector_u2_init, vector_u2_push, vector_u2_get, vector_u2_set, vector_u2_remove, vector_u2_deinit,
+    VectorU4, vector_u4_init, vector_u4_push, vector_u4_get, vector_u4_set, vector_u4_remove, vector_u4_deinit,
+    VectorU8, vector_u8_init, vector_u8_push, vector_u8_get, vector_u8_set, vector_u8_remove, vector_u8_deinit,
+    VectorS1, vector_s1_init, vector_s1_push, vector_s1_get, vector_s1_set, vector_s1_remove, vector_s1_deinit,
+    VectorS2, vector_s2_init, vector_s2_push, vector_s2_get, vector_s2_set, vector_s2_remove, vector_s2_deinit,
+    VectorS4, vector_s4_init, vector_s4_push, vector_s4_get, vector_s4_set, vector_s4_remove, vector_s4_deinit,
+    VectorS8, vector_s8_init, vector_s8_push, vector_s8_get, vector_s8_set, vector_s8_remove, vector_s8_deinit;
+import public/list.lowc : ListU1, list_u1_init, list_u1_append, list_u1_get, list_u1_remove, list_u1_deinit,
+    ListU2, list_u2_init, list_u2_append, list_u2_get, list_u2_remove, list_u2_deinit,
+    ListU4, list_u4_init, list_u4_append, list_u4_get, list_u4_remove, list_u4_deinit,
+    ListU8, list_u8_init, list_u8_append, list_u8_get, list_u8_remove, list_u8_deinit,
+    ListS1, list_s1_init, list_s1_append, list_s1_get, list_s1_remove, list_s1_deinit,
+    ListS2, list_s2_init, list_s2_append, list_s2_get, list_s2_remove, list_s2_deinit,
+    ListS4, list_s4_init, list_s4_append, list_s4_get, list_s4_remove, list_s4_deinit,
+    ListS8, list_s8_init, list_s8_append, list_s8_get, list_s8_remove, list_s8_deinit;
+import public/set.lowc : SetU1, set_u1_init, set_u1_add, set_u1_contains, set_u1_remove, set_u1_deinit,
+    SetU2, set_u2_init, set_u2_add, set_u2_contains, set_u2_remove, set_u2_deinit,
+    SetU4, set_u4_init, set_u4_add, set_u4_contains, set_u4_remove, set_u4_deinit,
+    SetU8, set_u8_init, set_u8_add, set_u8_contains, set_u8_remove, set_u8_deinit,
+    SetS1, set_s1_init, set_s1_add, set_s1_contains, set_s1_remove, set_s1_deinit,
+    SetS2, set_s2_init, set_s2_add, set_s2_contains, set_s2_remove, set_s2_deinit,
+    SetS4, set_s4_init, set_s4_add, set_s4_contains, set_s4_remove, set_s4_deinit,
+    SetS8, set_s8_init, set_s8_add, set_s8_contains, set_s8_remove, set_s8_deinit;
+
+s8 test_u1(void) {
+        struct VectorU1 vector = 0;
+        struct ListU1 list = 0;
+        struct SetU1 set = 0;
+        u1 value = 0;
+        u1 contains = 0;
+        s8 status = 0;
+
+        status = vector_u1_init(&vector, 0);
+        if (status != 0) return status;
+        if (vector_u1_push(&vector, 73) != 0) return 102;
+        if (vector_u1_push(&vector, 74) != 0) return 103;
+        if (vector_u1_get(&vector, 0, &value) != 0) return 104;
+        if (value != 73) return 105;
+        if (vector_u1_set(&vector, 1, 73) != 0 ||
+            vector_u1_get(&vector, 1, &value) != 0 || value != 73 ||
+            vector_u1_remove(&vector, 0, &value) != 0 || value != 73 ||
+            vector_u1_get(&vector, 1, &value) != -34 ||
+            vector_u1_deinit(&vector) != 0) {
+                return 20;
+        }
+
+        if (list_u1_init(&list) != 0 ||
+            list_u1_append(&list, 73) != 0 ||
+            list_u1_append(&list, 74) != 0 ||
+            list_u1_get(&list, 1, &value) != 0 || value != 74 ||
+            list_u1_remove(&list, 0, &value) != 0 || value != 73 ||
+            list_u1_get(&list, 0, &value) != 0 || value != 74 ||
+            list_u1_append(&list, 73) != 0 ||
+            list_u1_get(&list, 1, &value) != 0 || value != 73 ||
+            list_u1_remove(&list, 1, &value) != 0 || value != 73 ||
+            list_u1_deinit(&list) != 0 || list.size != 0 ||
+            list_u1_deinit(&list) != 0) {
+                return 30;
+        }
+
+        if (set_u1_init(&set, 0) != 0 ||
+            set_u1_add(&set, 73) != 1 ||
+            set_u1_add(&set, 74) != 1 ||
+            set_u1_add(&set, 73) != 0 ||
+            set_u1_contains(&set, 74, &contains) != 0 || contains != 1 ||
+            set_u1_remove(&set, 73) != 1 ||
+            set_u1_remove(&set, 73) != 0 ||
+            set_u1_contains(&set, 73, &contains) != 0 || contains != 0 ||
+            set_u1_deinit(&set) != 0) {
+                return 40;
+        }
+        return 0;
+}
+
+s8 test_u2(void) {
+        struct VectorU2 vector = 0;
+        struct ListU2 list = 0;
+        struct SetU2 set = 0;
+        u2 value = 0;
+        u1 contains = 0;
+
+        if (vector_u2_init(&vector, 0) != 0 ||
+            vector_u2_push(&vector, 1701) != 0 ||
+            vector_u2_push(&vector, 1702) != 0 ||
+            vector_u2_get(&vector, 0, &value) != 0 || value != 1701) {
+                return 11;
+        }
+        if (vector_u2_set(&vector, 1, 1701) != 0 ||
+            vector_u2_get(&vector, 1, &value) != 0 || value != 1701 ||
+            vector_u2_remove(&vector, 0, &value) != 0 || value != 1701 ||
+            vector_u2_get(&vector, 1, &value) != -34 ||
+            vector_u2_deinit(&vector) != 0) {
+                return 21;
+        }
+
+        if (list_u2_init(&list) != 0 ||
+            list_u2_append(&list, 1701) != 0 ||
+            list_u2_append(&list, 1702) != 0 ||
+            list_u2_get(&list, 1, &value) != 0 || value != 1702 ||
+            list_u2_remove(&list, 0, &value) != 0 || value != 1701 ||
+            list_u2_get(&list, 0, &value) != 0 || value != 1702 ||
+            list_u2_deinit(&list) != 0 || list.size != 0) {
+                return 31;
+        }
+
+        if (set_u2_init(&set, 0) != 0 ||
+            set_u2_add(&set, 1701) != 1 ||
+            set_u2_add(&set, 1702) != 1 ||
+            set_u2_add(&set, 1701) != 0 ||
+            set_u2_contains(&set, 1702, &contains) != 0 || contains != 1 ||
+            set_u2_remove(&set, 1701) != 1 ||
+            set_u2_remove(&set, 1701) != 0 ||
+            set_u2_contains(&set, 1701, &contains) != 0 || contains != 0 ||
+            set_u2_deinit(&set) != 0) {
+                return 41;
+        }
+        return 0;
+}
+
+s8 test_u4(void) {
+        struct VectorU4 vector = 0;
+        struct ListU4 list = 0;
+        struct SetU4 set = 0;
+        u4 value = 0;
+        u1 contains = 0;
+
+        if (vector_u4_init(&vector, 0) != 0 ||
+            vector_u4_push(&vector, 70001) != 0 ||
+            vector_u4_push(&vector, 70002) != 0 ||
+            vector_u4_get(&vector, 0, &value) != 0 || value != 70001) {
+                return 12;
+        }
+        if (vector_u4_set(&vector, 1, 70001) != 0 ||
+            vector_u4_get(&vector, 1, &value) != 0 || value != 70001 ||
+            vector_u4_remove(&vector, 0, &value) != 0 || value != 70001 ||
+            vector_u4_get(&vector, 1, &value) != -34 ||
+            vector_u4_deinit(&vector) != 0) {
+                return 22;
+        }
+
+        if (list_u4_init(&list) != 0 ||
+            list_u4_append(&list, 70001) != 0 ||
+            list_u4_append(&list, 70002) != 0 ||
+            list_u4_get(&list, 1, &value) != 0 || value != 70002 ||
+            list_u4_remove(&list, 0, &value) != 0 || value != 70001 ||
+            list_u4_get(&list, 0, &value) != 0 || value != 70002 ||
+            list_u4_deinit(&list) != 0 || list.size != 0) {
+                return 32;
+        }
+
+        if (set_u4_init(&set, 0) != 0 ||
+            set_u4_add(&set, 70001) != 1 ||
+            set_u4_add(&set, 70002) != 1 ||
+            set_u4_add(&set, 70001) != 0 ||
+            set_u4_contains(&set, 70002, &contains) != 0 || contains != 1 ||
+            set_u4_remove(&set, 70001) != 1 ||
+            set_u4_remove(&set, 70001) != 0 ||
+            set_u4_contains(&set, 70001, &contains) != 0 || contains != 0 ||
+            set_u4_deinit(&set) != 0) {
+                return 42;
+        }
+        return 0;
+}
+
+s8 test_u8(void) {
+        struct VectorU8 vector = 0;
+        struct ListU8 list = 0;
+        struct SetU8 set = 0;
+        u8 value = 0;
+        u1 contains = 0;
+
+        if (vector_u8_init(&vector, 0) != 0 ||
+            vector_u8_push(&vector, 900001) != 0 ||
+            vector_u8_push(&vector, 900002) != 0 ||
+            vector_u8_get(&vector, 0, &value) != 0 || value != 900001) {
+                return 13;
+        }
+        if (vector_u8_set(&vector, 1, 900001) != 0 ||
+            vector_u8_get(&vector, 1, &value) != 0 || value != 900001 ||
+            vector_u8_remove(&vector, 0, &value) != 0 || value != 900001 ||
+            vector_u8_get(&vector, 1, &value) != -34 ||
+            vector_u8_deinit(&vector) != 0) {
+                return 23;
+        }
+
+        if (list_u8_init(&list) != 0 ||
+            list_u8_append(&list, 900001) != 0 ||
+            list_u8_append(&list, 900002) != 0 ||
+            list_u8_get(&list, 1, &value) != 0 || value != 900002 ||
+            list_u8_remove(&list, 0, &value) != 0 || value != 900001 ||
+            list_u8_get(&list, 0, &value) != 0 || value != 900002 ||
+            list_u8_deinit(&list) != 0 || list.size != 0) {
+                return 33;
+        }
+
+        if (set_u8_init(&set, 0) != 0 ||
+            set_u8_add(&set, 900001) != 1 ||
+            set_u8_add(&set, 900002) != 1 ||
+            set_u8_add(&set, 900001) != 0 ||
+            set_u8_contains(&set, 900002, &contains) != 0 || contains != 1 ||
+            set_u8_remove(&set, 900001) != 1 ||
+            set_u8_remove(&set, 900001) != 0 ||
+            set_u8_contains(&set, 900001, &contains) != 0 || contains != 0 ||
+            set_u8_deinit(&set) != 0) {
+                return 43;
+        }
+        return 0;
+}
+
+s8 test_s1(void) {
+        struct VectorS1 vector = 0;
+        struct ListS1 list = 0;
+        struct SetS1 set = 0;
+        s1 value = 0;
+        u1 contains = 0;
+
+        if (vector_s1_init(&vector, 0) != 0 ||
+            vector_s1_push(&vector, -73) != 0 ||
+            vector_s1_push(&vector, -74) != 0 ||
+            vector_s1_get(&vector, 0, &value) != 0 || value != -73) {
+                return 14;
+        }
+        if (vector_s1_set(&vector, 1, -73) != 0 ||
+            vector_s1_get(&vector, 1, &value) != 0 || value != -73 ||
+            vector_s1_remove(&vector, 0, &value) != 0 || value != -73 ||
+            vector_s1_get(&vector, 1, &value) != -34 ||
+            vector_s1_deinit(&vector) != 0) {
+                return 24;
+        }
+
+        if (list_s1_init(&list) != 0 ||
+            list_s1_append(&list, -73) != 0 ||
+            list_s1_append(&list, -74) != 0 ||
+            list_s1_get(&list, 1, &value) != 0 || value != -74 ||
+            list_s1_remove(&list, 0, &value) != 0 || value != -73 ||
+            list_s1_get(&list, 0, &value) != 0 || value != -74 ||
+            list_s1_deinit(&list) != 0 || list.size != 0) {
+                return 34;
+        }
+
+        if (set_s1_init(&set, 0) != 0 ||
+            set_s1_add(&set, -73) != 1 ||
+            set_s1_add(&set, -74) != 1 ||
+            set_s1_add(&set, -73) != 0 ||
+            set_s1_contains(&set, -74, &contains) != 0 || contains != 1 ||
+            set_s1_remove(&set, -73) != 1 ||
+            set_s1_remove(&set, -73) != 0 ||
+            set_s1_contains(&set, -73, &contains) != 0 || contains != 0 ||
+            set_s1_deinit(&set) != 0) {
+                return 44;
+        }
+        return 0;
+}
+
+s8 test_s2(void) {
+        struct VectorS2 vector = 0;
+        struct ListS2 list = 0;
+        struct SetS2 set = 0;
+        s2 value = 0;
+        u1 contains = 0;
+
+        if (vector_s2_init(&vector, 0) != 0 ||
+            vector_s2_push(&vector, -1701) != 0 ||
+            vector_s2_push(&vector, -1702) != 0 ||
+            vector_s2_get(&vector, 0, &value) != 0 || value != -1701) {
+                return 15;
+        }
+        if (vector_s2_set(&vector, 1, -1701) != 0 ||
+            vector_s2_get(&vector, 1, &value) != 0 || value != -1701 ||
+            vector_s2_remove(&vector, 0, &value) != 0 || value != -1701 ||
+            vector_s2_get(&vector, 1, &value) != -34 ||
+            vector_s2_deinit(&vector) != 0) {
+                return 25;
+        }
+
+        if (list_s2_init(&list) != 0 ||
+            list_s2_append(&list, -1701) != 0 ||
+            list_s2_append(&list, -1702) != 0 ||
+            list_s2_get(&list, 1, &value) != 0 || value != -1702 ||
+            list_s2_remove(&list, 0, &value) != 0 || value != -1701 ||
+            list_s2_get(&list, 0, &value) != 0 || value != -1702 ||
+            list_s2_deinit(&list) != 0 || list.size != 0) {
+                return 35;
+        }
+
+        if (set_s2_init(&set, 0) != 0 ||
+            set_s2_add(&set, -1701) != 1 ||
+            set_s2_add(&set, -1702) != 1 ||
+            set_s2_add(&set, -1701) != 0 ||
+            set_s2_contains(&set, -1702, &contains) != 0 || contains != 1 ||
+            set_s2_remove(&set, -1701) != 1 ||
+            set_s2_remove(&set, -1701) != 0 ||
+            set_s2_contains(&set, -1701, &contains) != 0 || contains != 0 ||
+            set_s2_deinit(&set) != 0) {
+                return 45;
+        }
+        return 0;
+}
+
+s8 test_s4(void) {
+        struct VectorS4 vector = 0;
+        struct ListS4 list = 0;
+        struct SetS4 set = 0;
+        s4 value = 0;
+        u1 contains = 0;
+
+        if (vector_s4_init(&vector, 0) != 0 ||
+            vector_s4_push(&vector, -70001) != 0 ||
+            vector_s4_push(&vector, -70002) != 0 ||
+            vector_s4_get(&vector, 0, &value) != 0 || value != -70001) {
+                return 16;
+        }
+        if (vector_s4_set(&vector, 1, -70001) != 0 ||
+            vector_s4_get(&vector, 1, &value) != 0 || value != -70001 ||
+            vector_s4_remove(&vector, 0, &value) != 0 || value != -70001 ||
+            vector_s4_get(&vector, 1, &value) != -34 ||
+            vector_s4_deinit(&vector) != 0) {
+                return 26;
+        }
+
+        if (list_s4_init(&list) != 0 ||
+            list_s4_append(&list, -70001) != 0 ||
+            list_s4_append(&list, -70002) != 0 ||
+            list_s4_get(&list, 1, &value) != 0 || value != -70002 ||
+            list_s4_remove(&list, 0, &value) != 0 || value != -70001 ||
+            list_s4_get(&list, 0, &value) != 0 || value != -70002 ||
+            list_s4_deinit(&list) != 0 || list.size != 0) {
+                return 36;
+        }
+
+        if (set_s4_init(&set, 0) != 0 ||
+            set_s4_add(&set, -70001) != 1 ||
+            set_s4_add(&set, -70002) != 1 ||
+            set_s4_add(&set, -70001) != 0 ||
+            set_s4_contains(&set, -70002, &contains) != 0 || contains != 1 ||
+            set_s4_remove(&set, -70001) != 1 ||
+            set_s4_remove(&set, -70001) != 0 ||
+            set_s4_contains(&set, -70001, &contains) != 0 || contains != 0 ||
+            set_s4_deinit(&set) != 0) {
+                return 46;
+        }
+        return 0;
+}
+
+s8 test_s8(void) {
+        struct VectorS8 vector = 0;
+        struct ListS8 list = 0;
+        struct SetS8 set = 0;
+        s8 value = 0;
+        u1 contains = 0;
+
+        if (vector_s8_init(&vector, 0) != 0 ||
+            vector_s8_push(&vector, -900001) != 0 ||
+            vector_s8_push(&vector, -900002) != 0 ||
+            vector_s8_get(&vector, 0, &value) != 0 || value != -900001) {
+                return 17;
+        }
+        if (vector_s8_set(&vector, 1, -900001) != 0 ||
+            vector_s8_get(&vector, 1, &value) != 0 || value != -900001 ||
+            vector_s8_remove(&vector, 0, &value) != 0 || value != -900001 ||
+            vector_s8_get(&vector, 1, &value) != -34 ||
+            vector_s8_deinit(&vector) != 0) {
+                return 27;
+        }
+
+        if (list_s8_init(&list) != 0 ||
+            list_s8_append(&list, -900001) != 0 ||
+            list_s8_append(&list, -900002) != 0 ||
+            list_s8_get(&list, 1, &value) != 0 || value != -900002 ||
+            list_s8_remove(&list, 0, &value) != 0 || value != -900001 ||
+            list_s8_get(&list, 0, &value) != 0 || value != -900002 ||
+            list_s8_deinit(&list) != 0 || list.size != 0) {
+                return 37;
+        }
+
+        if (set_s8_init(&set, 0) != 0 ||
+            set_s8_add(&set, -900001) != 1 ||
+            set_s8_add(&set, -900002) != 1 ||
+            set_s8_add(&set, -900001) != 0 ||
+            set_s8_contains(&set, -900002, &contains) != 0 || contains != 1 ||
+            set_s8_remove(&set, -900001) != 1 ||
+            set_s8_remove(&set, -900001) != 0 ||
+            set_s8_contains(&set, -900001, &contains) != 0 || contains != 0 ||
+            set_s8_deinit(&set) != 0) {
+                return 47;
+        }
+        return 0;
+}
+
+s8 collections_test(void) {
+        s8 result = 0;
+
+        result = test_u1();
+        if (result != 0) return result;
+        result = test_u2();
+        if (result != 0) return result;
+        result = test_u4();
+        if (result != 0) return result;
+        result = test_u8();
+        if (result != 0) return result;
+        result = test_s1();
+        if (result != 0) return result;
+        result = test_s2();
+        if (result != 0) return result;
+        result = test_s4();
+        if (result != 0) return result;
+        result = test_s8();
+        if (result != 0) return result;
+
+        struct VectorU1 overflow = 0;
+        struct SetU1 set_overflow = 0;
+        if (vector_u1_init(&overflow, 9223372036854775807) != -75) {
+                return 20;
+        }
+        if (set_u1_init(&set_overflow, 9223372036854775807) != -75) {
+                return 21;
+        }
+        return 0;
+}

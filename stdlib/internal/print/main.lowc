@@ -18,11 +18,95 @@ void __lowc_write_stdout(u1* data, u8 length) {
         return;
 }
 
+void __lowc_print_u1(u1 value) {
+        u1 digits[3]   = 0;
+        u8 index       = 0;
+        u8 quotient    = 0;
+        u8 remainder   = 0;
+
+        index = 3;
+
+        if (value == 0) {
+                index         = 2;
+                digits[index] = 48;
+        }
+
+        for (; value != 0;) {
+                asm("xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
+                    : "=rax"(quotient)
+                    : "rax"(value), "rsi"(10), "rdi"(&remainder)
+                    : "rdx", "memory", "cc");
+
+                index         = index - 1;
+                digits[index] = 48 + remainder;
+                value         = quotient;
+        }
+
+        __lowc_write_stdout(&digits[index], 3 - index);
+        return;
+}
+
+void __lowc_print_u2(u2 value) {
+        u1 digits[5]   = 0;
+        u8 index       = 0;
+        u8 quotient    = 0;
+        u8 remainder   = 0;
+
+        index = 5;
+
+        if (value == 0) {
+                index         = 4;
+                digits[index] = 48;
+        }
+
+        for (; value != 0;) {
+                asm("xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
+                    : "=rax"(quotient)
+                    : "rax"(value), "rsi"(10), "rdi"(&remainder)
+                    : "rdx", "memory", "cc");
+
+                index         = index - 1;
+                digits[index] = 48 + remainder;
+                value         = quotient;
+        }
+
+        __lowc_write_stdout(&digits[index], 5 - index);
+        return;
+}
+
+void __lowc_print_u4(u4 value) {
+        u1 digits[10]  = 0;
+        u8 index       = 0;
+        u8 quotient    = 0;
+        u8 remainder   = 0;
+
+        index = 10;
+
+        if (value == 0) {
+                index         = 9;
+                digits[index] = 48;
+        }
+
+        for (; value != 0;) {
+                asm("xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
+                    : "=rax"(quotient)
+                    : "rax"(value), "rsi"(10), "rdi"(&remainder)
+                    : "rdx", "memory", "cc");
+
+                index         = index - 1;
+                digits[index] = 48 + remainder;
+                value         = quotient;
+        }
+
+        __lowc_write_stdout(&digits[index], 10 - index);
+        return;
+}
+
 void __lowc_print_u8(u8 value) {
-        u1 digits[20] = 0;
-        u8 index      = 0;
-        u8 quotient   = 0;
-        u8 remainder  = 0;
+        u1 digits[20]  = 0;
+        u8 index       = 0;
+        u8 quotient    = 0;
+        u8 remainder   = 0;
 
         index = 20;
 
@@ -46,16 +130,170 @@ void __lowc_print_u8(u8 value) {
         return;
 }
 
-void __lowc_print_s8(s8 value) {
-        u8 magnitude = 0;
+void __lowc_print_s1(s1 value) {
+        u1 digits[4]   = 0;
+        u1 magnitude   = 0;
+        u1 negative    = 0;
+        u8 index       = 0;
+        u8 quotient    = 0;
+        u8 remainder   = 0;
 
         if (value < 0) {
-                __lowc_write_stdout("-", 1);
+                negative = 1;
                 asm("neg rax" : "=rax"(magnitude) : "rax"(value) : "cc");
         } else {
                 magnitude = value;
         }
 
-        __lowc_print_u8(magnitude);
+        index = 4;
+
+        if (magnitude == 0) {
+                index         = 3;
+                digits[index] = 48;
+        }
+
+        for (; magnitude != 0;) {
+                asm("xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
+                    : "=rax"(quotient)
+                    : "rax"(magnitude), "rsi"(10), "rdi"(&remainder)
+                    : "rdx", "memory", "cc");
+
+                index         = index - 1;
+                digits[index] = 48 + remainder;
+                magnitude     = quotient;
+        }
+
+        if (negative != 0) {
+                index         = index - 1;
+                digits[index] = 45;
+        }
+
+        __lowc_write_stdout(&digits[index], 4 - index);
+        return;
+}
+
+void __lowc_print_s2(s2 value) {
+        u1 digits[6]   = 0;
+        u2 magnitude   = 0;
+        u1 negative    = 0;
+        u8 index       = 0;
+        u8 quotient    = 0;
+        u8 remainder   = 0;
+
+        if (value < 0) {
+                negative = 1;
+                asm("neg rax" : "=rax"(magnitude) : "rax"(value) : "cc");
+        } else {
+                magnitude = value;
+        }
+
+        index = 6;
+
+        if (magnitude == 0) {
+                index         = 5;
+                digits[index] = 48;
+        }
+
+        for (; magnitude != 0;) {
+                asm("xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
+                    : "=rax"(quotient)
+                    : "rax"(magnitude), "rsi"(10), "rdi"(&remainder)
+                    : "rdx", "memory", "cc");
+
+                index         = index - 1;
+                digits[index] = 48 + remainder;
+                magnitude     = quotient;
+        }
+
+        if (negative != 0) {
+                index         = index - 1;
+                digits[index] = 45;
+        }
+
+        __lowc_write_stdout(&digits[index], 6 - index);
+        return;
+}
+
+void __lowc_print_s4(s4 value) {
+        u1 digits[11]  = 0;
+        u4 magnitude   = 0;
+        u1 negative    = 0;
+        u8 index       = 0;
+        u8 quotient    = 0;
+        u8 remainder   = 0;
+
+        if (value < 0) {
+                negative = 1;
+                asm("neg rax" : "=rax"(magnitude) : "rax"(value) : "cc");
+        } else {
+                magnitude = value;
+        }
+
+        index = 11;
+
+        if (magnitude == 0) {
+                index         = 10;
+                digits[index] = 48;
+        }
+
+        for (; magnitude != 0;) {
+                asm("xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
+                    : "=rax"(quotient)
+                    : "rax"(magnitude), "rsi"(10), "rdi"(&remainder)
+                    : "rdx", "memory", "cc");
+
+                index         = index - 1;
+                digits[index] = 48 + remainder;
+                magnitude     = quotient;
+        }
+
+        if (negative != 0) {
+                index         = index - 1;
+                digits[index] = 45;
+        }
+
+        __lowc_write_stdout(&digits[index], 11 - index);
+        return;
+}
+
+void __lowc_print_s8(s8 value) {
+        u1 digits[20]  = 0;
+        u8 magnitude   = 0;
+        u1 negative    = 0;
+        u8 index       = 0;
+        u8 quotient    = 0;
+        u8 remainder   = 0;
+
+        if (value < 0) {
+                negative = 1;
+                asm("neg rax" : "=rax"(magnitude) : "rax"(value) : "cc");
+        } else {
+                magnitude = value;
+        }
+
+        index = 20;
+
+        if (magnitude == 0) {
+                index         = 19;
+                digits[index] = 48;
+        }
+
+        for (; magnitude != 0;) {
+                asm("xor rdx, rdx\ndiv rsi\nmov [rdi], rdx"
+                    : "=rax"(quotient)
+                    : "rax"(magnitude), "rsi"(10), "rdi"(&remainder)
+                    : "rdx", "memory", "cc");
+
+                index         = index - 1;
+                digits[index] = 48 + remainder;
+                magnitude     = quotient;
+        }
+
+        if (negative != 0) {
+                index         = index - 1;
+                digits[index] = 45;
+        }
+
+        __lowc_write_stdout(&digits[index], 20 - index);
         return;
 }

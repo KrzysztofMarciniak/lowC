@@ -1,5 +1,30 @@
-import network.lowc : TcpConnection, tcp_connect, tcp_send, tcp_receive, tcp_close;
+import network.lowc : TcpConnection, tcp_connect, tcp_send, tcp_receive,
+    tcp_close, tcp_set_timeout;
 import string.lowc : strlen;
+
+struct HttpRequest {
+    u1 *method;
+    u1 *path;
+    u1 *headers;
+    u1 *body;
+    u8 body_length;
+    u8 timeout_ms;
+};
+
+struct HttpResponse {
+    u1 *body;
+    u8 body_capacity;
+    u1 *headers;
+    u8 headers_capacity;
+    s4 status_code;
+};
+
+struct LowcHttpReader {
+    struct TcpConnection *connection;
+    u1 *buffer;
+    u8 length;
+    u8 offset;
+};
 
 u1 __lowc_http_valid_field(u1 *value) {
     u8 index = 0;
@@ -17,23 +42,160 @@ u1 __lowc_http_valid_field(u1 *value) {
     return 1;
 }
 
-u1 __lowc_http_has_chunked(u1 *headers, u8 length) {
-    u8 index = 0;
+u1 __lowc_http_equal_ascii(u1 left, u1 right) {
+    if (left >= 65 && left <= 90) {
+        left = left + 32;
+    }
+    if (right >= 65 && right <= 90) {
+        right = right + 32;
+    }
+    return left == right;
+}
 
-    for (; index + 7 <= length; index = index + 1) {
+u1 __lowc_http_contains_chunked(u1 *headers, u8 length) {
+    u8 index = 0;
+    u8 value_index = 0;
+    u8 inner_index = 0;
+    u1 expected = 0;
+    u1 name_matches = 0;
+    u1 value_matches = 0;
+
+    for (; index + 18 <= length; index = index + 1) {
+        name_matches =
+            __lowc_http_equal_ascii(headers[index], 116) &&
+            __lowc_http_equal_ascii(headers[index + 1], 114) &&
+            __lowc_http_equal_ascii(headers[index + 2], 97) &&
+            __lowc_http_equal_ascii(headers[index + 3], 110) &&
+            __lowc_http_equal_ascii(headers[index + 4], 115) &&
+            __lowc_http_equal_ascii(headers[index + 5], 102) &&
+            __lowc_http_equal_ascii(headers[index + 6], 101) &&
+            __lowc_http_equal_ascii(headers[index + 7], 114) &&
+            __lowc_http_equal_ascii(headers[index + 8], 45) &&
+            __lowc_http_equal_ascii(headers[index + 9], 101) &&
+            __lowc_http_equal_ascii(headers[index + 10], 110) &&
+            __lowc_http_equal_ascii(headers[index + 11], 99) &&
+            __lowc_http_equal_ascii(headers[index + 12], 111) &&
+            __lowc_http_equal_ascii(headers[index + 13], 100) &&
+            __lowc_http_equal_ascii(headers[index + 14], 105) &&
+            __lowc_http_equal_ascii(headers[index + 15], 110) &&
+            __lowc_http_equal_ascii(headers[index + 16], 103) &&
+            headers[index + 17] == 58;
         if (
-            (headers[index] == 99 || headers[index] == 67) &&
-            (headers[index + 1] == 104 || headers[index + 1] == 72) &&
-            (headers[index + 2] == 117 || headers[index + 2] == 85) &&
-            (headers[index + 3] == 110 || headers[index + 3] == 78) &&
-            (headers[index + 4] == 107 || headers[index + 4] == 75) &&
-            (headers[index + 5] == 101 || headers[index + 5] == 69) &&
-            (headers[index + 6] == 100 || headers[index + 6] == 68)
+            name_matches != 0 &&
+            (index == 0 || headers[index - 1] == 10)
         ) {
+            value_index = index + 18;
+            for (; value_index < length &&
+                 (headers[value_index] == 32 || headers[value_index] == 9);
+                 value_index = value_index + 1) {
+            }
+            for (; value_index + 7 <= length &&
+                 headers[value_index] != 13; value_index = value_index + 1) {
+                value_matches = 1;
+                for (inner_index = 0; inner_index < 7;
+                     inner_index = inner_index + 1) {
+                    if (inner_index == 0) {
+                        expected = 99;
+                    } else if (inner_index == 1) {
+                        expected = 104;
+                    } else if (inner_index == 2) {
+                        expected = 117;
+                    } else if (inner_index == 3) {
+                        expected = 110;
+                    } else if (inner_index == 4) {
+                        expected = 107;
+                    } else if (inner_index == 5) {
+                        expected = 101;
+                    } else {
+                        expected = 100;
+                    }
+                    if (
+                        __lowc_http_equal_ascii(
+                            headers[value_index + inner_index],
+                            expected
+                        ) == 0
+                    ) {
+                        value_matches = 0;
+                    }
+                }
+                if (
+                    value_matches != 0 &&
+                    (
+                        value_index == index + 18 ||
+                        headers[value_index - 1] == 32 ||
+                        headers[value_index - 1] == 9 ||
+                        headers[value_index - 1] == 44
+                    ) &&
+                    (
+                        value_index + 7 == length ||
+                        headers[value_index + 7] == 13 ||
+                        headers[value_index + 7] == 32 ||
+                        headers[value_index + 7] == 9 ||
+                        headers[value_index + 7] == 44 ||
+                        headers[value_index + 7] == 59
+                    )
+                ) {
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+s8 __lowc_http_content_length(u1 *headers, u8 length, u8 *output) {
+    u8 index = 0;
+    u8 value_index = 0;
+    u8 parsed = 0;
+    u8 digit = 0;
+    u8 digits = 0;
+
+    *output = 0;
+    for (; index + 15 < length; index = index + 1) {
+        if (
+            (index == 0 || headers[index - 1] == 10) &&
+            __lowc_http_equal_ascii(headers[index], 99) &&
+            __lowc_http_equal_ascii(headers[index + 1], 111) &&
+            __lowc_http_equal_ascii(headers[index + 2], 110) &&
+            __lowc_http_equal_ascii(headers[index + 3], 116) &&
+            __lowc_http_equal_ascii(headers[index + 4], 101) &&
+            __lowc_http_equal_ascii(headers[index + 5], 110) &&
+            __lowc_http_equal_ascii(headers[index + 6], 116) &&
+            __lowc_http_equal_ascii(headers[index + 7], 45) &&
+            __lowc_http_equal_ascii(headers[index + 8], 108) &&
+            __lowc_http_equal_ascii(headers[index + 9], 101) &&
+            __lowc_http_equal_ascii(headers[index + 10], 110) &&
+            __lowc_http_equal_ascii(headers[index + 11], 103) &&
+            __lowc_http_equal_ascii(headers[index + 12], 116) &&
+            __lowc_http_equal_ascii(headers[index + 13], 104) &&
+            headers[index + 14] == 58
+        ) {
+            value_index = index + 15;
+            for (; value_index < length &&
+                 (headers[value_index] == 32 || headers[value_index] == 9);
+                 value_index = value_index + 1) {
+            }
+            parsed = 0;
+            digits = 0;
+            for (; value_index < length && headers[value_index] != 13;
+                 value_index = value_index + 1) {
+                if (headers[value_index] < 48 || headers[value_index] > 57) {
+                    return -1;
+                }
+                digit = headers[value_index] - 48;
+                if (parsed > (922337203685477580 - digit) / 10) {
+                    return -1;
+                }
+                parsed = parsed * 10 + digit;
+                digits = digits + 1;
+            }
+            if (digits == 0) {
+                return -1;
+            }
+            *output = parsed;
             return 1;
         }
     }
-
     return 0;
 }
 
@@ -52,52 +214,275 @@ s8 __lowc_http_send_all(
         if (written == 0) {
             return -20004;
         }
-
         buffer = buffer + written;
         length = length - written;
     }
-
     return 0;
 }
 
-s8, s4 http_get(
+s8 __lowc_http_read_byte(struct LowcHttpReader *reader) {
+    s8 received = 0;
+
+    if (reader->offset == reader->length) {
+        received = tcp_receive(
+            reader->connection,
+            reader->buffer,
+            1024
+        );
+        if (received < 0) {
+            return received;
+        }
+        if (received == 0) {
+            return -20001;
+        }
+        reader->length = received;
+        reader->offset = 0;
+    }
+    received = reader->buffer[reader->offset];
+    reader->offset = reader->offset + 1;
+    return received;
+}
+
+s8 __lowc_http_read_line(
+    struct LowcHttpReader *reader,
+    u1 *line,
+    u8 capacity,
+    u8 *line_length
+) {
+    s8 value = 0;
+    u1 previous = 0;
+
+    *line_length = 0;
+    for (; 1;) {
+        value = __lowc_http_read_byte(reader);
+        if (value < 0) {
+            return value;
+        }
+        if (previous == 13) {
+            if (value != 10) {
+                return -20001;
+            }
+            return 0;
+        }
+        if (value == 13) {
+            previous = 13;
+        } else {
+            if (value == 10 || *line_length >= capacity) {
+                return -20001;
+            }
+            line[*line_length] = value;
+            *line_length = *line_length + 1;
+        }
+    }
+    return -20001;
+}
+
+s8 __lowc_http_read_chunked(
+    struct LowcHttpReader *reader,
+    u1 *body,
+    u8 capacity,
+    u8 *body_length
+) {
+    u1 line[128] = 0;
+    u8 line_length = 0;
+
+    u8 index = 0;
+    u8 size = 0;
+    u8 digit = 0;
+    u8 digits = 0;
+    u8 trailer_length = 0;
+    u1 in_extension = 0;
+    s8 value = 0;
+
+    *body_length = 0;
+    for (; 1;) {
+        value = __lowc_http_read_line(reader, &line[0], 127, &line_length);
+        if (value != 0) {
+            return value;
+        }
+        size = 0;
+        digits = 0;
+        in_extension = 0;
+        for (index = 0; index < line_length; index = index + 1) {
+            if (line[index] == 59) {
+                in_extension = 1;
+            } else if (in_extension == 0) {
+                if (line[index] >= 48 && line[index] <= 57) {
+                    digit = line[index] - 48;
+                } else if (line[index] >= 65 && line[index] <= 70) {
+                    digit = line[index] - 65 + 10;
+                } else if (line[index] >= 97 && line[index] <= 102) {
+                    digit = line[index] - 97 + 10;
+                } else {
+                    return -20001;
+                }
+                if (digit > capacity || size > (capacity - digit) / 16) {
+                    return -20002;
+                }
+                size = size * 16 + digit;
+                digits = digits + 1;
+            }
+        }
+        if (digits == 0) {
+            return -20001;
+        }
+        if (size == 0) {
+            for (; 1;) {
+                value = __lowc_http_read_line(
+                    reader,
+                    &line[0],
+                    127,
+                    &trailer_length
+                );
+                if (value != 0) {
+                    return value;
+                }
+                if (trailer_length == 0) {
+                    return 0;
+                }
+            }
+        }
+        if (size > capacity - *body_length) {
+            return -20002;
+        }
+        for (index = 0; index < size; index = index + 1) {
+            value = __lowc_http_read_byte(reader);
+            if (value < 0) {
+                return value;
+            }
+            body[*body_length] = value;
+            *body_length = *body_length + 1;
+        }
+        value = __lowc_http_read_byte(reader);
+        if (value != 13) {
+            return -20001;
+        }
+        value = __lowc_http_read_byte(reader);
+        if (value != 10) {
+            return -20001;
+        }
+    }
+    return -20001;
+}
+
+s8 http_request(
     u1 *host,
     u8 port,
-    u1 *path,
-    u1 *body,
-    u8 body_capacity
+    struct HttpRequest *request,
+    struct HttpResponse *response
 ) {
     struct TcpConnection connection = 0;
-    u1 chunk[1024] = 0;
-    u1 headers[4096] = 0;
+    struct LowcHttpReader reader = 0;
+    u1 receive_buffer[1024] = 0;
+    u1 digits[21] = 0;
+    u8 digit_count = 0;
+    u8 request_headers_length = 0;
     u8 header_length = 0;
-    s8 received = 0;
-    u8 index = 0;
     u8 body_length = 0;
-    u8 status_index = 0;
-    u8 digit_index = 0;
-    u8 digit = 0;
-    u1 header_complete = 0;
-    u1 status_found = 0;
-    s4 status_code = 0;
+    u8 content_length = 0;
+    u8 index = 0;
+    u8 line_length = 0;
+    s8 value = 0;
     s8 result = 0;
+    s4 status_code = 0;
+    u8 status_digits = 0;
+    u1 chunked = 0;
+    s8 has_content_length = 0;
+    u1 previous = 0;
+    u1 header_complete = 0;
+    u1 body_complete = 0;
+    u8 request_body_length = 0;
 
+    response->status_code = 0;
     if (
         __lowc_http_valid_field(host) == 0 ||
-        __lowc_http_valid_field(path) == 0 ||
-        path[0] != 47
+        __lowc_http_valid_field(request->method) == 0 ||
+        __lowc_http_valid_field(request->path) == 0 ||
+        request->path[0] != 47 ||
+        response->headers_capacity == 0
     ) {
-        return -20003, 0;
+        return -20003;
+    }
+    for (index = 0; host[index] != 0; index = index + 1) {
+        if (host[index] <= 32) {
+            return -20003;
+        }
+    }
+    for (index = 0; request->path[index] != 0; index = index + 1) {
+        if (request->path[index] <= 32) {
+            return -20003;
+        }
+    }
+    for (index = 0; request->method[index] != 0; index = index + 1) {
+        if (
+            (request->method[index] < 65 || request->method[index] > 90) &&
+            (request->method[index] < 97 || request->method[index] > 122) &&
+            request->method[index] != 45
+        ) {
+            return -20003;
+        }
+    }
+    request_headers_length = strlen(request->headers);
+    for (index = 0; index < request_headers_length; index = index + 1) {
+        if (
+            request->headers[index] < 32 &&
+            request->headers[index] != 9 &&
+            request->headers[index] != 13 &&
+            request->headers[index] != 10
+        ) {
+            return -20003;
+        }
+        if (
+            request->headers[index] == 13 &&
+            (
+                index + 1 >= request_headers_length ||
+                request->headers[index + 1] != 10
+            )
+        ) {
+            return -20003;
+        }
+        if (
+            request->headers[index] == 10 &&
+            (index == 0 || request->headers[index - 1] != 13)
+        ) {
+            return -20003;
+        }
+        if (
+            index + 3 < request_headers_length &&
+            request->headers[index] == 13 &&
+            request->headers[index + 1] == 10 &&
+            request->headers[index + 2] == 13 &&
+            request->headers[index + 3] == 10
+        ) {
+            return -20003;
+        }
     }
 
     result = tcp_connect(host, port, &connection);
     if (result != 0) {
-        return result, 0;
+        return result;
     }
-
-    result = __lowc_http_send_all(&connection, "GET ", 4);
+    result = tcp_set_timeout(
+        &connection,
+        request->timeout_ms,
+        request->timeout_ms
+    );
     if (result == 0) {
-        result = __lowc_http_send_all(&connection, path, strlen(path));
+        result = __lowc_http_send_all(
+            &connection,
+            request->method,
+            strlen(request->method)
+        );
+    }
+    if (result == 0) {
+        result = __lowc_http_send_all(&connection, " ", 1);
+    }
+    if (result == 0) {
+        result = __lowc_http_send_all(
+            &connection,
+            request->path,
+            strlen(request->path)
+        );
     }
     if (result == 0) {
         result = __lowc_http_send_all(
@@ -110,110 +495,210 @@ s8, s4 http_get(
         result = __lowc_http_send_all(&connection, host, strlen(host));
     }
     if (result == 0) {
+        result = __lowc_http_send_all(&connection, "\r\n", 2);
+    }
+    if (result == 0 && request_headers_length != 0) {
         result = __lowc_http_send_all(
             &connection,
-            "\r\nConnection: close\r\n\r\n",
-            23
+            request->headers,
+            request_headers_length
+        );
+        if (
+            result == 0 &&
+            (
+                request_headers_length < 2 ||
+                request->headers[request_headers_length - 2] != 13 ||
+                request->headers[request_headers_length - 1] != 10
+            )
+        ) {
+            result = __lowc_http_send_all(&connection, "\r\n", 2);
+        }
+    }
+    request_body_length = request->body_length;
+    if (result == 0 && request_body_length != 0) {
+        result = __lowc_http_send_all(&connection, "Content-Length: ", 16);
+        digit_count = 0;
+        for (; request_body_length != 0;) {
+            digits[digit_count] = 48 + request_body_length % 10;
+            digit_count = digit_count + 1;
+            request_body_length = request_body_length / 10;
+        }
+        for (; result == 0 && digit_count != 0;) {
+            digit_count = digit_count - 1;
+            result = __lowc_http_send_all(
+                &connection,
+                &digits[digit_count],
+                1
+            );
+        }
+        if (result == 0) {
+            result = __lowc_http_send_all(&connection, "\r\n", 2);
+        }
+    }
+    if (result == 0) {
+        result = __lowc_http_send_all(
+            &connection,
+            "Connection: close\r\n\r\n",
+            21
+        );
+    }
+    if (result == 0 && request->body_length != 0) {
+        result = __lowc_http_send_all(
+            &connection,
+            request->body,
+            request->body_length
         );
     }
     if (result != 0) {
         tcp_close(&connection);
-        return result, 0;
+        return result;
     }
 
+    reader.connection = &connection;
+    reader.buffer = &receive_buffer[0];
+    reader.length = 0;
+    reader.offset = 0;
     for (; header_complete == 0;) {
-        received = tcp_receive(&connection, &chunk[0], 1024);
-        if (received < 0) {
+        value = __lowc_http_read_byte(&reader);
+        if (value < 0) {
             tcp_close(&connection);
-            return received, 0;
+            return value;
         }
-        if (received == 0) {
+        if (header_length + 1 >= response->headers_capacity) {
             tcp_close(&connection);
-            return -20001, 0;
+            return -20006;
         }
-
-        for (index = 0; index < received && header_complete == 0;
-             index = index + 1) {
-            if (header_length == 4096) {
-                tcp_close(&connection);
-                return -20001, 0;
-            }
-
-            headers[header_length] = chunk[index];
-            header_length = header_length + 1;
-            if (
-                header_length >= 4 &&
-                headers[header_length - 4] == 13 &&
-                headers[header_length - 3] == 10 &&
-                headers[header_length - 2] == 13 &&
-                headers[header_length - 1] == 10
-            ) {
-                header_complete = 1;
-                index = index + 1;
-                for (; index < received; index = index + 1) {
-                    if (body_length == body_capacity) {
-                        tcp_close(&connection);
-                        return -20002, 0;
-                    }
-                    body[body_length] = chunk[index];
-                    body_length = body_length + 1;
-                }
-            }
+        response->headers[header_length] = value;
+        header_length = header_length + 1;
+        if (
+            header_length >= 4 &&
+            response->headers[header_length - 4] == 13 &&
+            response->headers[header_length - 3] == 10 &&
+            response->headers[header_length - 2] == 13 &&
+            response->headers[header_length - 1] == 10
+        ) {
+            header_complete = 1;
+        }
+        if (header_complete == 0 && header_length >= 4096) {
+            tcp_close(&connection);
+            return -20006;
         }
     }
+    response->headers[header_length] = 0;
 
-    if (__lowc_http_has_chunked(&headers[0], header_length)) {
-        tcp_close(&connection);
-        return -20005, 0;
-    }
-
-    for (index = 0; index < header_length && headers[index] != 32;
+    for (index = 0; index < header_length && response->headers[index] != 32;
          index = index + 1) {
     }
-    if (index == header_length || index + 3 >= header_length) {
+    if (index == header_length) {
         tcp_close(&connection);
-        return -20001, 0;
+        return -20001;
     }
-
-    status_index = index + 1;
-    status_found = 1;
-    for (digit_index = 0; digit_index < 3; digit_index = digit_index + 1) {
-        digit = headers[status_index + digit_index];
-        if (digit < 48 || digit > 57) {
-            status_found = 0;
-        } else {
-            status_code = status_code * 10 + digit - 48;
-        }
+    for (index = index + 1; index < header_length &&
+         response->headers[index] == 32; index = index + 1) {
     }
-    if (status_found == 0) {
+    for (; index < header_length && response->headers[index] >= 48 &&
+         response->headers[index] <= 57; index = index + 1) {
+        status_code = status_code * 10 + response->headers[index] - 48;
+        status_digits = status_digits + 1;
+    }
+    if (
+        status_digits != 3 ||
+        (response->headers[index] != 32 && response->headers[index] != 13) ||
+        status_code < 100 ||
+        status_code > 599
+    ) {
         tcp_close(&connection);
-        return -20001, 0;
+        return -20001;
     }
+    response->status_code = status_code;
 
-    received = -1;
-    for (; received != 0;) {
-        received = tcp_receive(&connection, &chunk[0], 1024);
-        if (received < 0) {
+    chunked = __lowc_http_contains_chunked(response->headers, header_length);
+    has_content_length = __lowc_http_content_length(
+        response->headers,
+        header_length,
+        &content_length
+    );
+    if (has_content_length < 0) {
+        tcp_close(&connection);
+        return -20001;
+    }
+    if (chunked != 0) {
+        result = __lowc_http_read_chunked(
+            &reader,
+            response->body,
+            response->body_capacity,
+            &body_length
+        );
+    } else if (has_content_length != 0) {
+        if (content_length > response->body_capacity) {
             tcp_close(&connection);
-            return received, 0;
+            return -20002;
         }
-        if (received != 0) {
-            if (received > body_capacity - body_length) {
+        for (; body_length < content_length; body_length = body_length + 1) {
+            value = __lowc_http_read_byte(&reader);
+            if (value < 0) {
                 tcp_close(&connection);
-                return -20002, 0;
+                return value;
             }
-
-            for (index = 0; index < received; index = index + 1) {
-                body[body_length + index] = chunk[index];
+            response->body[body_length] = value;
+        }
+        result = 0;
+    } else {
+        body_complete = 0;
+        for (; body_complete == 0;) {
+            value = __lowc_http_read_byte(&reader);
+            if (value == -20001) {
+                result = 0;
+                body_complete = 1;
+            } else if (value < 0) {
+                result = value;
+                body_complete = 1;
+            } else if (body_length == response->body_capacity) {
+                result = -20002;
+                body_complete = 1;
+            } else {
+                response->body[body_length] = value;
+                body_length = body_length + 1;
             }
-            body_length = body_length + received;
         }
     }
-
-    result = tcp_close(&connection);
+    value = tcp_close(&connection);
     if (result != 0) {
-        return result, 0;
+        return result;
     }
+    if (value != 0) {
+        return value;
+    }
+    return body_length;
+}
 
-    return body_length, status_code;
+s8, s4 http_get(
+    u1 *host,
+    u8 port,
+    u1 *path,
+    u1 *body,
+    u8 body_capacity
+) {
+    struct HttpRequest request = 0;
+    struct HttpResponse response = 0;
+    u1 method[4] = 0;
+    u1 empty_headers[1] = 0;
+    u1 response_headers[4096] = 0;
+    s8 result = 0;
+
+    method[0] = 71;
+    method[1] = 69;
+    method[2] = 84;
+    request.method = &method[0];
+    request.path = path;
+    request.headers = &empty_headers[0];
+    request.body_length = 0;
+    request.timeout_ms = 0;
+    response.body = body;
+    response.body_capacity = body_capacity;
+    response.headers = &response_headers[0];
+    response.headers_capacity = 4096;
+    response.status_code = 0;
+    result = http_request(host, port, &request, &response);
+    return result, response.status_code;
 }

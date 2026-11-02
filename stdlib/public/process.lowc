@@ -1,0 +1,175 @@
+void __lowc_process_close(s4 descriptor) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(3), "rdi"(descriptor)
+        : "rcx", "r11", "memory", "cc");
+    return;
+}
+
+s4 __lowc_process_execv(u1 *path, u1 **arguments) {
+    s4 result = 0;
+
+    asm("call execv@PLT"
+        : "=rax"(result)
+        : "rdi"(path), "rsi"(arguments)
+        : "rcx", "rdx", "r8", "r9", "r10", "r11", "memory", "cc");
+    return result;
+}
+
+s4 __lowc_process_errno(void) {
+    s4 result = 0;
+
+    asm("call __errno_location@PLT\nmov eax, [rax]"
+        : "=rax"(result)
+        :
+        : "rcx", "rdx", "rdi", "rsi", "r8", "r9", "r10", "r11", "memory", "cc");
+    return result;
+}
+
+s8 __lowc_process_pipe(s4 *descriptors) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(293), "rdi"(descriptors), "rsi"(524288)
+        : "rcx", "r11", "memory", "cc");
+    return result;
+}
+
+s8 __lowc_process_read_error(s4 descriptor, s4 *buffer) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(0), "rdi"(descriptor), "rsi"(buffer), "rdx"(4)
+        : "rcx", "r11", "memory", "cc");
+    return result;
+}
+
+s8 __lowc_process_write_error(s4 descriptor, s4 *buffer) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(1), "rdi"(descriptor), "rsi"(buffer), "rdx"(4)
+        : "rcx", "r11", "memory", "cc");
+    return result;
+}
+
+s8 __lowc_process_wait4(s4 process_id, s4 *status) {
+    s8 result = 0;
+
+    asm("syscall"
+        : "=rax"(result)
+        : "rax"(61), "rdi"(process_id), "rsi"(status), "rdx"(0), "r10"(0)
+        : "rcx", "r11", "memory", "cc");
+    return result;
+}
+
+struct Process {
+    s4 process_id;
+};
+
+// Arguments must be a NUL-terminated pointer vector. Strings/vector are
+// borrowed through the call; no shell is invoked.
+s8 process_spawn(u1 *path, u1 **arguments, struct Process *process) {
+    s4 descriptors[2] = 0;
+    s4 process_id = 0;
+    s4 child_error = 0;
+    s4 child_status = 0;
+    s8 result = 0;
+    u1 *null_path = 0;
+    u1 **null_arguments = 0;
+    struct Process *null_process = 0;
+
+    if (path == null_path || path[0] == 0 || arguments == null_arguments ||
+        process == null_process) {
+        return -22;
+    }
+    process->process_id = -1;
+    result = __lowc_process_pipe(&descriptors[0]);
+    if (result < 0) {
+        return result;
+    }
+    asm("syscall"
+        : "=rax"(process_id)
+        : "rax"(57)
+        : "rcx", "r11", "memory", "cc");
+    if (process_id < 0) {
+        child_error = process_id;
+        __lowc_process_close(descriptors[0]);
+        __lowc_process_close(descriptors[1]);
+        return child_error;
+    }
+
+    if (process_id == 0) {
+        __lowc_process_close(descriptors[0]);
+        __lowc_process_execv(path, arguments);
+        child_error = __lowc_process_errno();
+        __lowc_process_write_error(descriptors[1], &child_error);
+        asm("syscall"
+            :
+            : "rax"(60), "rdi"(127)
+            : "rcx", "r11", "memory", "cc");
+        return -5;
+    }
+
+    __lowc_process_close(descriptors[1]);
+    result = __lowc_process_read_error(descriptors[0], &child_error);
+    for (; result == -4;) {
+        result = __lowc_process_read_error(descriptors[0], &child_error);
+    }
+    __lowc_process_close(descriptors[0]);
+    if (result < 0) {
+        __lowc_process_wait4(process_id, &child_status);
+        return result;
+    }
+    if (result > 0) {
+        __lowc_process_wait4(process_id, &child_status);
+        if (result != 4) {
+            return -5;
+        }
+        return -child_error;
+    }
+
+    process->process_id = process_id;
+    return 0;
+}
+
+// Waits for the child and reports normal exit versus signal termination.
+s8 process_wait(
+    struct Process *process,
+    u1 *exited,
+    s4 *exit_code,
+    s4 *term_signal
+) {
+    s4 status = 0;
+    s4 result = 0;
+    struct Process *null_process = 0;
+    u1 *null_exited = 0;
+    s4 *null_status = 0;
+
+    if (process == null_process || exited == null_exited ||
+        exit_code == null_status || term_signal == null_status ||
+        process->process_id < 0) {
+        return -22;
+    }
+    result = __lowc_process_wait4(process->process_id, &status);
+    if (result < 0) {
+        return result;
+    }
+
+    process->process_id = -1;
+    *exited = 0;
+    *exit_code = -1;
+    *term_signal = 0;
+    if (status % 128 == 0) {
+        *exited = 1;
+        *exit_code = status / 256 % 256;
+    } else if (status % 128 != 127) {
+        *term_signal = status % 128;
+    }
+    return 0;
+}

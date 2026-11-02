@@ -1,0 +1,6 @@
+import visibility-module.lowc : exported_function;
+
+void entrypoint(void) {
+    private_function();
+    return;
+}

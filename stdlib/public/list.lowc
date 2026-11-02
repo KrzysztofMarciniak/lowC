@@ -1,0 +1,1003 @@
+
+import ../internal/collections/memory.lowc : __lowc_collections_alloc, __lowc_collections_free;
+
+// Instance and output pointers must be valid; operations return 0 or a negative errno.
+struct ListU1Node {
+        u1 value;
+        struct ListU1Node* next;
+};
+
+struct ListU1 {
+        struct ListU1Node* head;
+        struct ListU1Node* tail;
+        u8 size;
+};
+
+s8 list_u1_init(struct ListU1* list) {
+        struct ListU1Node* empty = 0;
+        list->head = empty;
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+s8 list_u1_append(struct ListU1* list, u1 value) {
+        struct ListU1Node* empty = 0;
+        void* allocation = 0;
+        struct ListU1Node* node = 0;
+        s8 result = 0;
+
+        if (list->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __lowc_collections_alloc(16, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        node = allocation;
+        node->value = value;
+        node->next = empty;
+        if (list->size == 0) {
+                list->head = node;
+        } else {
+                list->tail->next = node;
+        }
+        list->tail = node;
+        list->size = list->size + 1;
+        return 0;
+}
+
+s8 list_u1_get(struct ListU1* list, u8 index, u1* value) {
+        u8 cursor = 0;
+        struct ListU1Node* node = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                node = node->next;
+        }
+        *value = node->value;
+        return 0;
+}
+
+s8 list_u1_remove(struct ListU1* list, u8 index, u1* value) {
+        u8 cursor = 0;
+        struct ListU1Node* previous = 0;
+        struct ListU1Node* node = 0;
+        struct ListU1Node* next = 0;
+        s8 result = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                previous = node;
+                node = node->next;
+        }
+        *value = node->value;
+        next = node->next;
+        if (index == 0) {
+                list->head = next;
+        } else {
+                previous->next = next;
+        }
+        if (index + 1 == list->size) {
+                list->tail = previous;
+        }
+        result = __lowc_collections_free(node);
+        if (result < 0) {
+                if (index == 0) {
+                        list->head = node;
+                } else {
+                        previous->next = node;
+                }
+                node->next = next;
+                if (index + 1 == list->size || list->size == 1) {
+                        list->tail = node;
+                }
+                return result;
+        }
+        list->size = list->size - 1;
+        return 0;
+}
+
+s8 list_u1_deinit(struct ListU1* list) {
+        struct ListU1Node* empty = 0;
+        struct ListU1Node* node = 0;
+        struct ListU1Node* next = 0;
+        s8 result = 0;
+
+        node = list->head;
+        for (; list->size != 0;) {
+                next = node->next;
+                result = __lowc_collections_free(node);
+                if (result < 0) {
+                        list->head = node;
+                        return result;
+                }
+                list->head = next;
+                list->size = list->size - 1;
+                node = next;
+        }
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+struct ListU2Node {
+        u2 value;
+        struct ListU2Node* next;
+};
+
+struct ListU2 {
+        struct ListU2Node* head;
+        struct ListU2Node* tail;
+        u8 size;
+};
+
+s8 list_u2_init(struct ListU2* list) {
+        struct ListU2Node* empty = 0;
+        list->head = empty;
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+s8 list_u2_append(struct ListU2* list, u2 value) {
+        struct ListU2Node* empty = 0;
+        void* allocation = 0;
+        struct ListU2Node* node = 0;
+        s8 result = 0;
+
+        if (list->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __lowc_collections_alloc(16, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        node = allocation;
+        node->value = value;
+        node->next = empty;
+        if (list->size == 0) {
+                list->head = node;
+        } else {
+                list->tail->next = node;
+        }
+        list->tail = node;
+        list->size = list->size + 1;
+        return 0;
+}
+
+s8 list_u2_get(struct ListU2* list, u8 index, u2* value) {
+        u8 cursor = 0;
+        struct ListU2Node* node = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                node = node->next;
+        }
+        *value = node->value;
+        return 0;
+}
+
+s8 list_u2_remove(struct ListU2* list, u8 index, u2* value) {
+        u8 cursor = 0;
+        struct ListU2Node* previous = 0;
+        struct ListU2Node* node = 0;
+        struct ListU2Node* next = 0;
+        s8 result = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                previous = node;
+                node = node->next;
+        }
+        *value = node->value;
+        next = node->next;
+        if (index == 0) {
+                list->head = next;
+        } else {
+                previous->next = next;
+        }
+        if (index + 1 == list->size) {
+                list->tail = previous;
+        }
+        result = __lowc_collections_free(node);
+        if (result < 0) {
+                if (index == 0) {
+                        list->head = node;
+                } else {
+                        previous->next = node;
+                }
+                node->next = next;
+                if (index + 1 == list->size || list->size == 1) {
+                        list->tail = node;
+                }
+                return result;
+        }
+        list->size = list->size - 1;
+        return 0;
+}
+
+s8 list_u2_deinit(struct ListU2* list) {
+        struct ListU2Node* empty = 0;
+        struct ListU2Node* node = 0;
+        struct ListU2Node* next = 0;
+        s8 result = 0;
+
+        node = list->head;
+        for (; list->size != 0;) {
+                next = node->next;
+                result = __lowc_collections_free(node);
+                if (result < 0) {
+                        list->head = node;
+                        return result;
+                }
+                list->head = next;
+                list->size = list->size - 1;
+                node = next;
+        }
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+struct ListU4Node {
+        u4 value;
+        struct ListU4Node* next;
+};
+
+struct ListU4 {
+        struct ListU4Node* head;
+        struct ListU4Node* tail;
+        u8 size;
+};
+
+s8 list_u4_init(struct ListU4* list) {
+        struct ListU4Node* empty = 0;
+        list->head = empty;
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+s8 list_u4_append(struct ListU4* list, u4 value) {
+        struct ListU4Node* empty = 0;
+        void* allocation = 0;
+        struct ListU4Node* node = 0;
+        s8 result = 0;
+
+        if (list->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __lowc_collections_alloc(16, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        node = allocation;
+        node->value = value;
+        node->next = empty;
+        if (list->size == 0) {
+                list->head = node;
+        } else {
+                list->tail->next = node;
+        }
+        list->tail = node;
+        list->size = list->size + 1;
+        return 0;
+}
+
+s8 list_u4_get(struct ListU4* list, u8 index, u4* value) {
+        u8 cursor = 0;
+        struct ListU4Node* node = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                node = node->next;
+        }
+        *value = node->value;
+        return 0;
+}
+
+s8 list_u4_remove(struct ListU4* list, u8 index, u4* value) {
+        u8 cursor = 0;
+        struct ListU4Node* previous = 0;
+        struct ListU4Node* node = 0;
+        struct ListU4Node* next = 0;
+        s8 result = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                previous = node;
+                node = node->next;
+        }
+        *value = node->value;
+        next = node->next;
+        if (index == 0) {
+                list->head = next;
+        } else {
+                previous->next = next;
+        }
+        if (index + 1 == list->size) {
+                list->tail = previous;
+        }
+        result = __lowc_collections_free(node);
+        if (result < 0) {
+                if (index == 0) {
+                        list->head = node;
+                } else {
+                        previous->next = node;
+                }
+                node->next = next;
+                if (index + 1 == list->size || list->size == 1) {
+                        list->tail = node;
+                }
+                return result;
+        }
+        list->size = list->size - 1;
+        return 0;
+}
+
+s8 list_u4_deinit(struct ListU4* list) {
+        struct ListU4Node* empty = 0;
+        struct ListU4Node* node = 0;
+        struct ListU4Node* next = 0;
+        s8 result = 0;
+
+        node = list->head;
+        for (; list->size != 0;) {
+                next = node->next;
+                result = __lowc_collections_free(node);
+                if (result < 0) {
+                        list->head = node;
+                        return result;
+                }
+                list->head = next;
+                list->size = list->size - 1;
+                node = next;
+        }
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+struct ListU8Node {
+        u8 value;
+        struct ListU8Node* next;
+};
+
+struct ListU8 {
+        struct ListU8Node* head;
+        struct ListU8Node* tail;
+        u8 size;
+};
+
+s8 list_u8_init(struct ListU8* list) {
+        struct ListU8Node* empty = 0;
+        list->head = empty;
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+s8 list_u8_append(struct ListU8* list, u8 value) {
+        struct ListU8Node* empty = 0;
+        void* allocation = 0;
+        struct ListU8Node* node = 0;
+        s8 result = 0;
+
+        if (list->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __lowc_collections_alloc(16, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        node = allocation;
+        node->value = value;
+        node->next = empty;
+        if (list->size == 0) {
+                list->head = node;
+        } else {
+                list->tail->next = node;
+        }
+        list->tail = node;
+        list->size = list->size + 1;
+        return 0;
+}
+
+s8 list_u8_get(struct ListU8* list, u8 index, u8* value) {
+        u8 cursor = 0;
+        struct ListU8Node* node = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                node = node->next;
+        }
+        *value = node->value;
+        return 0;
+}
+
+s8 list_u8_remove(struct ListU8* list, u8 index, u8* value) {
+        u8 cursor = 0;
+        struct ListU8Node* previous = 0;
+        struct ListU8Node* node = 0;
+        struct ListU8Node* next = 0;
+        s8 result = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                previous = node;
+                node = node->next;
+        }
+        *value = node->value;
+        next = node->next;
+        if (index == 0) {
+                list->head = next;
+        } else {
+                previous->next = next;
+        }
+        if (index + 1 == list->size) {
+                list->tail = previous;
+        }
+        result = __lowc_collections_free(node);
+        if (result < 0) {
+                if (index == 0) {
+                        list->head = node;
+                } else {
+                        previous->next = node;
+                }
+                node->next = next;
+                if (index + 1 == list->size || list->size == 1) {
+                        list->tail = node;
+                }
+                return result;
+        }
+        list->size = list->size - 1;
+        return 0;
+}
+
+s8 list_u8_deinit(struct ListU8* list) {
+        struct ListU8Node* empty = 0;
+        struct ListU8Node* node = 0;
+        struct ListU8Node* next = 0;
+        s8 result = 0;
+
+        node = list->head;
+        for (; list->size != 0;) {
+                next = node->next;
+                result = __lowc_collections_free(node);
+                if (result < 0) {
+                        list->head = node;
+                        return result;
+                }
+                list->head = next;
+                list->size = list->size - 1;
+                node = next;
+        }
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+struct ListS1Node {
+        s1 value;
+        struct ListS1Node* next;
+};
+
+struct ListS1 {
+        struct ListS1Node* head;
+        struct ListS1Node* tail;
+        u8 size;
+};
+
+s8 list_s1_init(struct ListS1* list) {
+        struct ListS1Node* empty = 0;
+        list->head = empty;
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+s8 list_s1_append(struct ListS1* list, s1 value) {
+        struct ListS1Node* empty = 0;
+        void* allocation = 0;
+        struct ListS1Node* node = 0;
+        s8 result = 0;
+
+        if (list->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __lowc_collections_alloc(16, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        node = allocation;
+        node->value = value;
+        node->next = empty;
+        if (list->size == 0) {
+                list->head = node;
+        } else {
+                list->tail->next = node;
+        }
+        list->tail = node;
+        list->size = list->size + 1;
+        return 0;
+}
+
+s8 list_s1_get(struct ListS1* list, u8 index, s1* value) {
+        u8 cursor = 0;
+        struct ListS1Node* node = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                node = node->next;
+        }
+        *value = node->value;
+        return 0;
+}
+
+s8 list_s1_remove(struct ListS1* list, u8 index, s1* value) {
+        u8 cursor = 0;
+        struct ListS1Node* previous = 0;
+        struct ListS1Node* node = 0;
+        struct ListS1Node* next = 0;
+        s8 result = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                previous = node;
+                node = node->next;
+        }
+        *value = node->value;
+        next = node->next;
+        if (index == 0) {
+                list->head = next;
+        } else {
+                previous->next = next;
+        }
+        if (index + 1 == list->size) {
+                list->tail = previous;
+        }
+        result = __lowc_collections_free(node);
+        if (result < 0) {
+                if (index == 0) {
+                        list->head = node;
+                } else {
+                        previous->next = node;
+                }
+                node->next = next;
+                if (index + 1 == list->size || list->size == 1) {
+                        list->tail = node;
+                }
+                return result;
+        }
+        list->size = list->size - 1;
+        return 0;
+}
+
+s8 list_s1_deinit(struct ListS1* list) {
+        struct ListS1Node* empty = 0;
+        struct ListS1Node* node = 0;
+        struct ListS1Node* next = 0;
+        s8 result = 0;
+
+        node = list->head;
+        for (; list->size != 0;) {
+                next = node->next;
+                result = __lowc_collections_free(node);
+                if (result < 0) {
+                        list->head = node;
+                        return result;
+                }
+                list->head = next;
+                list->size = list->size - 1;
+                node = next;
+        }
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+struct ListS2Node {
+        s2 value;
+        struct ListS2Node* next;
+};
+
+struct ListS2 {
+        struct ListS2Node* head;
+        struct ListS2Node* tail;
+        u8 size;
+};
+
+s8 list_s2_init(struct ListS2* list) {
+        struct ListS2Node* empty = 0;
+        list->head = empty;
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+s8 list_s2_append(struct ListS2* list, s2 value) {
+        struct ListS2Node* empty = 0;
+        void* allocation = 0;
+        struct ListS2Node* node = 0;
+        s8 result = 0;
+
+        if (list->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __lowc_collections_alloc(16, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        node = allocation;
+        node->value = value;
+        node->next = empty;
+        if (list->size == 0) {
+                list->head = node;
+        } else {
+                list->tail->next = node;
+        }
+        list->tail = node;
+        list->size = list->size + 1;
+        return 0;
+}
+
+s8 list_s2_get(struct ListS2* list, u8 index, s2* value) {
+        u8 cursor = 0;
+        struct ListS2Node* node = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                node = node->next;
+        }
+        *value = node->value;
+        return 0;
+}
+
+s8 list_s2_remove(struct ListS2* list, u8 index, s2* value) {
+        u8 cursor = 0;
+        struct ListS2Node* previous = 0;
+        struct ListS2Node* node = 0;
+        struct ListS2Node* next = 0;
+        s8 result = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                previous = node;
+                node = node->next;
+        }
+        *value = node->value;
+        next = node->next;
+        if (index == 0) {
+                list->head = next;
+        } else {
+                previous->next = next;
+        }
+        if (index + 1 == list->size) {
+                list->tail = previous;
+        }
+        result = __lowc_collections_free(node);
+        if (result < 0) {
+                if (index == 0) {
+                        list->head = node;
+                } else {
+                        previous->next = node;
+                }
+                node->next = next;
+                if (index + 1 == list->size || list->size == 1) {
+                        list->tail = node;
+                }
+                return result;
+        }
+        list->size = list->size - 1;
+        return 0;
+}
+
+s8 list_s2_deinit(struct ListS2* list) {
+        struct ListS2Node* empty = 0;
+        struct ListS2Node* node = 0;
+        struct ListS2Node* next = 0;
+        s8 result = 0;
+
+        node = list->head;
+        for (; list->size != 0;) {
+                next = node->next;
+                result = __lowc_collections_free(node);
+                if (result < 0) {
+                        list->head = node;
+                        return result;
+                }
+                list->head = next;
+                list->size = list->size - 1;
+                node = next;
+        }
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+struct ListS4Node {
+        s4 value;
+        struct ListS4Node* next;
+};
+
+struct ListS4 {
+        struct ListS4Node* head;
+        struct ListS4Node* tail;
+        u8 size;
+};
+
+s8 list_s4_init(struct ListS4* list) {
+        struct ListS4Node* empty = 0;
+        list->head = empty;
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+s8 list_s4_append(struct ListS4* list, s4 value) {
+        struct ListS4Node* empty = 0;
+        void* allocation = 0;
+        struct ListS4Node* node = 0;
+        s8 result = 0;
+
+        if (list->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __lowc_collections_alloc(16, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        node = allocation;
+        node->value = value;
+        node->next = empty;
+        if (list->size == 0) {
+                list->head = node;
+        } else {
+                list->tail->next = node;
+        }
+        list->tail = node;
+        list->size = list->size + 1;
+        return 0;
+}
+
+s8 list_s4_get(struct ListS4* list, u8 index, s4* value) {
+        u8 cursor = 0;
+        struct ListS4Node* node = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                node = node->next;
+        }
+        *value = node->value;
+        return 0;
+}
+
+s8 list_s4_remove(struct ListS4* list, u8 index, s4* value) {
+        u8 cursor = 0;
+        struct ListS4Node* previous = 0;
+        struct ListS4Node* node = 0;
+        struct ListS4Node* next = 0;
+        s8 result = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                previous = node;
+                node = node->next;
+        }
+        *value = node->value;
+        next = node->next;
+        if (index == 0) {
+                list->head = next;
+        } else {
+                previous->next = next;
+        }
+        if (index + 1 == list->size) {
+                list->tail = previous;
+        }
+        result = __lowc_collections_free(node);
+        if (result < 0) {
+                if (index == 0) {
+                        list->head = node;
+                } else {
+                        previous->next = node;
+                }
+                node->next = next;
+                if (index + 1 == list->size || list->size == 1) {
+                        list->tail = node;
+                }
+                return result;
+        }
+        list->size = list->size - 1;
+        return 0;
+}
+
+s8 list_s4_deinit(struct ListS4* list) {
+        struct ListS4Node* empty = 0;
+        struct ListS4Node* node = 0;
+        struct ListS4Node* next = 0;
+        s8 result = 0;
+
+        node = list->head;
+        for (; list->size != 0;) {
+                next = node->next;
+                result = __lowc_collections_free(node);
+                if (result < 0) {
+                        list->head = node;
+                        return result;
+                }
+                list->head = next;
+                list->size = list->size - 1;
+                node = next;
+        }
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+struct ListS8Node {
+        s8 value;
+        struct ListS8Node* next;
+};
+
+struct ListS8 {
+        struct ListS8Node* head;
+        struct ListS8Node* tail;
+        u8 size;
+};
+
+s8 list_s8_init(struct ListS8* list) {
+        struct ListS8Node* empty = 0;
+        list->head = empty;
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}
+
+s8 list_s8_append(struct ListS8* list, s8 value) {
+        struct ListS8Node* empty = 0;
+        void* allocation = 0;
+        struct ListS8Node* node = 0;
+        s8 result = 0;
+
+        if (list->size == 9223372036854775807) {
+                return -75;
+        }
+        result = __lowc_collections_alloc(16, &allocation);
+        if (result < 0) {
+                return result;
+        }
+        node = allocation;
+        node->value = value;
+        node->next = empty;
+        if (list->size == 0) {
+                list->head = node;
+        } else {
+                list->tail->next = node;
+        }
+        list->tail = node;
+        list->size = list->size + 1;
+        return 0;
+}
+
+s8 list_s8_get(struct ListS8* list, u8 index, s8* value) {
+        u8 cursor = 0;
+        struct ListS8Node* node = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                node = node->next;
+        }
+        *value = node->value;
+        return 0;
+}
+
+s8 list_s8_remove(struct ListS8* list, u8 index, s8* value) {
+        u8 cursor = 0;
+        struct ListS8Node* previous = 0;
+        struct ListS8Node* node = 0;
+        struct ListS8Node* next = 0;
+        s8 result = 0;
+
+        if (index >= list->size) {
+                return -34;
+        }
+        node = list->head;
+        for (cursor = 0; cursor < index; cursor = cursor + 1) {
+                previous = node;
+                node = node->next;
+        }
+        *value = node->value;
+        next = node->next;
+        if (index == 0) {
+                list->head = next;
+        } else {
+                previous->next = next;
+        }
+        if (index + 1 == list->size) {
+                list->tail = previous;
+        }
+        result = __lowc_collections_free(node);
+        if (result < 0) {
+                if (index == 0) {
+                        list->head = node;
+                } else {
+                        previous->next = node;
+                }
+                node->next = next;
+                if (index + 1 == list->size || list->size == 1) {
+                        list->tail = node;
+                }
+                return result;
+        }
+        list->size = list->size - 1;
+        return 0;
+}
+
+s8 list_s8_deinit(struct ListS8* list) {
+        struct ListS8Node* empty = 0;
+        struct ListS8Node* node = 0;
+        struct ListS8Node* next = 0;
+        s8 result = 0;
+
+        node = list->head;
+        for (; list->size != 0;) {
+                next = node->next;
+                result = __lowc_collections_free(node);
+                if (result < 0) {
+                        list->head = node;
+                        return result;
+                }
+                list->head = next;
+                list->size = list->size - 1;
+                node = next;
+        }
+        list->tail = empty;
+        list->size = 0;
+        return 0;
+}

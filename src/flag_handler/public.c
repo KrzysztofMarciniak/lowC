@@ -367,4 +367,10 @@ flag_handler_print_help(
         program,
         program
     );
+
+    printf(
+        "Developer tests: use `make test TEST=<area>`; areas: all, smoke, "
+        "frontend, modules, optimization, semantic, standard-library, "
+        "inline-asm.\n"
+    );
 }

@@ -1,0 +1,21 @@
+s8 __lowc_time_clock_gettime(s8 clock_id, s8* time_spec) {
+        s8 result = 0;
+
+        asm("syscall"
+            : "=rax"(result)
+            : "rax"(228), "rdi"(clock_id), "rsi"(time_spec)
+            : "rcx", "r11", "memory", "cc");
+
+        return result;
+}
+
+s8 __lowc_time_nanosleep(s8* request) {
+        s8 result = 0;
+
+        asm("syscall"
+            : "=rax"(result)
+            : "rax"(35), "rdi"(request), "rsi"(0)
+            : "rcx", "r11", "memory", "cc");
+
+        return result;
+}

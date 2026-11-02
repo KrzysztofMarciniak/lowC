@@ -1,0 +1,141 @@
+import ../internal/time/main.lowc : __lowc_time_clock_gettime,
+    __lowc_time_nanosleep;
+
+// Linux x86-64 timespec layout. nanoseconds is always in [0, 999999999].
+struct TimeSpec {
+        s8 seconds;
+        s8 nanoseconds;
+};
+
+// Returns monotonic nanoseconds, or a negative errno on failure/overflow.
+s8 time_monotonic_ns(void) {
+        struct TimeSpec time = 0;
+        s8 result            = 0;
+
+        result = __lowc_time_clock_gettime(1, &time.seconds);
+        if (result < 0) {
+                return result;
+        }
+
+        if (time.seconds < 0 || time.seconds > 9223372036 ||
+            (time.seconds == 9223372036 && time.nanoseconds > 854775807)) {
+                return -75;
+        }
+
+        return time.seconds * 1000000000 + time.nanoseconds;
+}
+
+// Writes CLOCK_REALTIME seconds/nanoseconds and returns 0 or a negative errno.
+s8 time_wall_clock(struct TimeSpec* result) {
+        return __lowc_time_clock_gettime(0, &result->seconds);
+}
+
+// Sleeps for a normalized duration; returns 0 or a negative errno.
+s8 time_sleep(s8 seconds, s8 nanoseconds) {
+        struct TimeSpec request = 0;
+
+        if (seconds < 0 || nanoseconds < 0 || nanoseconds >= 1000000000) {
+                return -22;
+        }
+
+        request.seconds     = seconds;
+        request.nanoseconds = nanoseconds;
+        return __lowc_time_nanosleep(&request.seconds);
+}
+
+void __lowc_time_write_two_digits(u1 *buffer, u8 offset, s8 value) {
+        buffer[offset]     = 48 + value / 10;
+        buffer[offset + 1] = 48 + value % 10;
+        return;
+}
+
+// Formats UTC as YYYY-MM-DDTHH:MM:SS.nnnnnnnnnZ (30 bytes, no NUL).
+// Pointers must be non-null. Returns 30, -22 for unnormalized nanoseconds,
+// -34 for years outside 0000..9999, or -28 when the buffer is too small.
+s8 time_format_rfc3339_utc(struct TimeSpec* value, u1* buffer, u8 capacity) {
+        s8 days        = 0;
+        s8 day_seconds = 0;
+        s8 year        = 0;
+        s8 era         = 0;
+        s8 day_of_era  = 0;
+        s8 year_of_era = 0;
+        s8 day_of_year = 0;
+        s8 month_prime = 0;
+        s8 month       = 0;
+        s8 day         = 0;
+        s8 hour        = 0;
+        s8 minute      = 0;
+        s8 second      = 0;
+
+        if (value->nanoseconds < 0 || value->nanoseconds >= 1000000000) {
+                return -22;
+        }
+        if (capacity < 30) {
+                return -28;
+        }
+        if (value->seconds < -62167219200 || value->seconds > 253402300799) {
+                return -34;
+        }
+
+        days        = value->seconds / 86400;
+        day_seconds = value->seconds % 86400;
+        if (day_seconds < 0) {
+                days        = days - 1;
+                day_seconds = day_seconds + 86400;
+        }
+
+        hour   = day_seconds / 3600;
+        minute = (day_seconds % 3600) / 60;
+        second = day_seconds % 60;
+
+        days = days + 719468;
+        era  = days / 146097;
+        if (days < 0) {
+                era = (days - 146096) / 146097;
+        }
+        day_of_era  = days - era * 146097;
+        year_of_era = (day_of_era - day_of_era / 1460 + day_of_era / 36524 -
+                       day_of_era / 146096) /
+                      365;
+        year        = year_of_era + era * 400;
+        day_of_year = day_of_era -
+                      (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+        month_prime = (5 * day_of_year + 2) / 153;
+        day         = day_of_year - (153 * month_prime + 2) / 5 + 1;
+        if (month_prime < 10) {
+                month = month_prime + 3;
+        } else {
+                month = month_prime - 9;
+        }
+        if (month <= 2) {
+                year = year + 1;
+        }
+
+        buffer[0] = 48 + year / 1000;
+        buffer[1] = 48 + (year / 100) % 10;
+        buffer[2] = 48 + (year / 10) % 10;
+        buffer[3] = 48 + year % 10;
+        buffer[4] = 45;
+        __lowc_time_write_two_digits(buffer, 5, month);
+        buffer[7] = 45;
+        __lowc_time_write_two_digits(buffer, 8, day);
+        buffer[10] = 84;
+        __lowc_time_write_two_digits(buffer, 11, hour);
+        buffer[13] = 58;
+        __lowc_time_write_two_digits(buffer, 14, minute);
+        buffer[16] = 58;
+        __lowc_time_write_two_digits(buffer, 17, second);
+        buffer[19] = 46;
+        buffer[20] = 48 + value->nanoseconds / 100000000;
+        buffer[21] = 48 + (value->nanoseconds / 10000000) % 10;
+        buffer[22] = 48 + (value->nanoseconds / 1000000) % 10;
+        buffer[23] = 48 + (value->nanoseconds / 100000) % 10;
+        buffer[24] = 48 + (value->nanoseconds / 10000) % 10;
+        buffer[25] = 48 + (value->nanoseconds / 1000) % 10;
+        buffer[26] = 48 + (value->nanoseconds / 100) % 10;
+        buffer[27] = 48 + (value->nanoseconds / 10) % 10;
+        buffer[28] = 48 + value->nanoseconds % 10;
+        buffer[29] = 90;
+
+        return 30;
+}

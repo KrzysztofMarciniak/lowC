@@ -1,0 +1,10 @@
+import visibility-module.lowc : exported_function;
+
+s8 read_private_global(void) {
+    return private_global;
+}
+
+void entrypoint(void) {
+    read_private_global();
+    return;
+}

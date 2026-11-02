@@ -1,0 +1,169 @@
+import public/directory.lowc : directory_create, directory_remove,
+    working_directory_get, working_directory_set;
+import public/env.lowc : env_get, env_set, env_unset;
+import public/file.lowc : File, FileMetadata, file_open_write, file_write,
+    file_close, file_exists, file_metadata;
+import public/path.lowc : path_join, path_basename, path_dirname,
+    path_normalize;
+import public/process.lowc : Process, process_spawn, process_wait;
+import public/string.lowc : strcmp;
+
+foreign c void lowc_test_result(s4 result);
+foreign c void lowc_test_debug(s8 result);
+foreign c u1 *lowc_test_base_path(void);
+
+s4 os_test(u1 *base_path) {
+    u1 joined[256] = 0;
+    u1 path[256] = 0;
+    u1 normalized[256] = 0;
+    u1 cwd[256] = 0;
+    u1 original_cwd[256] = 0;
+    u1 *value = 0;
+    u1 *null_value = 0;
+    u1 *null_path = 0;
+    u1 found = 0;
+    s8 result = 0;
+    u1 exited = 0;
+    s4 exit_code = 0;
+    s4 term_signal = 0;
+    struct File file = 0;
+    struct FileMetadata metadata = 0;
+    struct Process process = 0;
+    u1 *arguments[2] = 0;
+
+    if (path_join("root", "leaf", &joined[0], 256) != 9 ||
+        strcmp(&joined[0], "root/leaf") != 0 ||
+        path_join("ignored", "/absolute", &joined[0], 256) != 9 ||
+        strcmp(&joined[0], "/absolute") != 0) {
+        return 1;
+    }
+    if (path_basename("/alpha/beta///", &path[0], 256) != 4 ||
+        strcmp(&path[0], "beta") != 0 ||
+        path_dirname("/alpha/beta", &path[0], 256) != 6 ||
+        strcmp(&path[0], "/alpha") != 0 ||
+        path_dirname("single///", &path[0], 256) != 1 ||
+        strcmp(&path[0], ".") != 0 ||
+        path_basename("/", &path[0], 256) != 1 ||
+        strcmp(&path[0], "/") != 0 ||
+        path_join(null_path, "x", &path[0], 256) != -22) {
+        return 2;
+    }
+    if (path_normalize("../alpha/./beta/../gamma", &normalized[0], 256) != 14 ||
+        strcmp(&normalized[0], "../alpha/gamma") != 0 ||
+        path_normalize("/alpha/../../beta", &normalized[0], 256) != 5 ||
+        strcmp(&normalized[0], "/beta") != 0 ||
+        path_normalize("long", &path[0], 2) != -36) {
+        return 3;
+    }
+
+    if (env_set("LOWC_OS_TEST", "available", 1) != 0 ||
+        env_set("LOWC_OS_TEST", "ignored", 0) != 0) {
+        return 4;
+    }
+    (found, value) = env_get("LOWC_OS_TEST");
+    if (found == 0 || strcmp(value, "available") != 0 ||
+        env_unset("LOWC_OS_TEST") != 0) {
+        return 5;
+    }
+    (found, value) = env_get("LOWC_OS_TEST");
+    if (found != 0 || value != null_value || env_set("", "bad", 1) != -22) {
+        return 6;
+    }
+
+    if (path_join(base_path, "file", &path[0], 256) < 0 ||
+        file_open_write(&path[0], &file) != 0 ||
+        file_write(&file, "data", 4) != 4 || file_close(&file) != 0) {
+        return 7;
+    }
+    (found, result) = file_exists(&path[0]);
+    if (found == 0 || result != 0 ||
+        file_metadata(&path[0], &metadata) != 0 ||
+        metadata.size != 4 || metadata.kind != 32768) {
+        return 8;
+    }
+    if (path_join(base_path, "missing-file", &path[0], 256) < 0) {
+        return 9;
+    }
+    (found, result) = file_exists(&path[0]);
+    if (found != 0 || result != 0 ||
+        file_metadata(&path[0], &metadata) != -2) {
+        return 10;
+    }
+
+    if (working_directory_get(&original_cwd[0], 256) != 0) {
+        return 111;
+    }
+    if (path_join(base_path, "directory", &path[0], 256) < 0) {
+        return 112;
+    }
+    if (directory_create(&path[0], 448) != 0) {
+        return 113;
+    }
+    if (directory_create(&path[0], 448) != -17) {
+        return 130;
+    }
+    if (working_directory_set(&path[0]) != 0) {
+        return 114;
+    }
+    if (working_directory_get(&cwd[0], 256) != 0) {
+        return 115;
+    }
+    if (strcmp(&cwd[0], &path[0]) != 0) {
+        return 116;
+    }
+    if (working_directory_set(&original_cwd[0]) != 0) {
+        return 117;
+    }
+    if (directory_remove(&path[0]) != 0) {
+        return 118;
+    }
+    if (working_directory_get(&cwd[0], 1) != -34) {
+        return 119;
+    }
+    if (working_directory_get(&cwd[0], 0) != -22) {
+        return 131;
+    }
+    if (directory_remove(&path[0]) != -2) {
+        return 132;
+    }
+    if (working_directory_set("/lowc-os-path-does-not-exist") != -2) {
+        return 120;
+    }
+
+    arguments[0] = "/bin/true";
+    result = process_spawn("/bin/true", &arguments[0], &process);
+    if (result != 0) {
+        lowc_test_debug(result);
+        return 121;
+    }
+    if (process_wait(&process, &exited, &exit_code, &term_signal) != 0) {
+        return 122;
+    }
+    if (exited == 0 || exit_code != 0 || term_signal != 0) {
+        return 123;
+    }
+    if (process_wait(&process, &exited, &exit_code, &term_signal) != -22) {
+        return 124;
+    }
+    arguments[0] = "/bin/false";
+    if (process_spawn("/bin/false", &arguments[0], &process) != 0 ||
+        process_wait(&process, &exited, &exit_code, &term_signal) != 0 ||
+        exited == 0 || exit_code != 1) {
+        return 13;
+    }
+    arguments[0] = "/lowc-os-executable-does-not-exist";
+    if (process_spawn(arguments[0], &arguments[0], &process) != -2) {
+        return 14;
+    }
+    return 0;
+}
+
+void entrypoint(void) {
+    u1 *base_path = 0;
+    s4 result = 0;
+
+    base_path = lowc_test_base_path();
+    result = os_test(base_path);
+    lowc_test_result(result);
+    return;
+}

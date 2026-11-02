@@ -1,0 +1,43 @@
+import ../internal/os/main.lowc : __lowc_os_directory_create,
+    __lowc_os_directory_remove, __lowc_os_getcwd, __lowc_os_chdir;
+
+s8 directory_create(u1 *path, u4 mode) {
+    u1 *null_path = 0;
+
+    if (path == null_path) {
+        return -22;
+    }
+    return __lowc_os_directory_create(path, mode);
+}
+
+s8 directory_remove(u1 *path) {
+    u1 *null_path = 0;
+
+    if (path == null_path) {
+        return -22;
+    }
+    return __lowc_os_directory_remove(path);
+}
+
+// Writes a NUL-terminated path into the caller-owned buffer; capacity includes
+// the terminator. Returns 0 or a negative Linux error code.
+s8 working_directory_get(u1 *buffer, u8 capacity) {
+    u1 *null_buffer = 0;
+
+    if (buffer == null_buffer) {
+        return -22;
+    }
+    if (capacity == 0) {
+        return -22;
+    }
+    return __lowc_os_getcwd(buffer, capacity);
+}
+
+s8 working_directory_set(u1 *path) {
+    u1 *null_path = 0;
+
+    if (path == null_path) {
+        return -22;
+    }
+    return __lowc_os_chdir(path);
+}

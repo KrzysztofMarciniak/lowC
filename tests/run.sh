@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Run smoke examples and a focused integration suite, optionally filtered by area.
+# Run smoke examples and one or more focused suites.
 
 set -uo pipefail
 
@@ -19,10 +19,10 @@ if [ ! -x "$BIN" ]; then
     exit 1
 fi
 
-SUITES=(frontend modules optimization semantic standard_library inline_asm)
+SUITES=(async frontend inline-asm modules optimization semantic standard-library)
 
 case "$FILTER" in
-    all|smoke|frontend|modules|optimization|semantic|standard_library|inline_asm)
+    all|smoke|async|frontend|inline-asm|modules|optimization|semantic|standard-library)
         ;;
     *)
         echo "error: unknown test suite '$FILTER'" >&2
@@ -44,9 +44,9 @@ failed=0
 run_smoke_tests() {
     local source mode name output status assembler_output
 
-    for source in "$TESTS_DIR"/examples/*.lowc; do
+    for source in "$TESTS_DIR"/smoke/examples/*.lowc; do
         if [ ! -f "$source" ]; then
-            echo "error: no smoke examples found in '$TESTS_DIR/examples'" >&2
+            echo "error: no smoke examples found in '$TESTS_DIR/smoke/examples'" >&2
             failed=$((failed + 1))
             return
         fi
@@ -85,7 +85,7 @@ run_suite() {
     local suite=$1
     total=$((total + 1))
 
-    if ! bash "$TESTS_DIR/suites/$suite.sh" "$BIN" "$TEMP_ROOT"; then
+    if ! bash "$TESTS_DIR/suites/$suite/run.sh" "$BIN" "$TEMP_ROOT"; then
         failed=$((failed + 1))
         echo "FAIL [suite] $suite"
     fi

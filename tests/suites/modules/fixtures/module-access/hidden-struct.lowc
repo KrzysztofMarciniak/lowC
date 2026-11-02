@@ -1,0 +1,6 @@
+import visibility-module.lowc : exported_function;
+
+void entrypoint(void) {
+    struct PrivateType item = 0;
+    return;
+}
