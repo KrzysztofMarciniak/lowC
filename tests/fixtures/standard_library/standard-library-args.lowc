@@ -1,7 +1,5 @@
-#include "@PUBLIC_ROOT@/args.lowc" :
-    "args_count", "args_get";
-#include "@PUBLIC_ROOT@/print.lowc" :
-    "print", "print_u8";
+import public/args.lowc : args_count, args_get;
+import public/print.lowc : print, print_u8;
 
 void entrypoint(void) {
     u8 count = 0;

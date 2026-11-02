@@ -23,7 +23,8 @@ typedef enum token_type
     TOKEN_ASM,
     TOKEN_FOREIGN,
 
-    TOKEN_INCLUDE,
+    TOKEN_IMPORT,
+    TOKEN_IMPORT_PATH,
 
     TOKEN_PLUS,
     TOKEN_MINUS,

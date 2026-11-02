@@ -10,6 +10,7 @@ typedef struct lexer_state
     unsigned long position;
     unsigned long line;
     unsigned long column;
+    int import_path_expected;
 } lexer_state;
 
 token

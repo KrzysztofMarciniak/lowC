@@ -1,4 +1,4 @@
-#include "visibility_dependency.lowc" : "dependency_value";
+import visibility_dependency.lowc : dependency_value;
 
 struct Exported {
     s8 value;

@@ -1,7 +1,6 @@
-#include "@PUBLIC_ROOT@/print.lowc" :
-    "print", "print_u1", "print_u2", "print_u4", "print_u8",
-    "print_s1", "print_s2", "print_s4", "print_s8";
-#include "@PUBLIC_ROOT@/string.lowc" : "parse_u8";
+import public/print.lowc : print, print_u1, print_u2, print_u4, print_u8,
+    print_s1, print_s2, print_s4, print_s8;
+import public/string.lowc : parse_u8;
 
 u8 standard_library_numbers_test(void) {
     u1 parsed = 0;

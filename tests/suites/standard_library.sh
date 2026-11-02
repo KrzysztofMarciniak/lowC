@@ -14,7 +14,9 @@ then
     exit 1
 fi
 
-test_render_library_fixture "standard-library-print.lowc" || exit 1
+export LOWC_STDLIB_DIR="$TEMP_DIR/usr/local/share/lowc"
+
+test_copy_fixture "standard-library-print.lowc" || exit 1
 
 test_copy_fixture "entrypoint_harness.c" || exit 1
 
@@ -51,7 +53,7 @@ then
     exit 1
 fi
 
-test_render_library_fixture "standard-library-numbers.lowc" || exit 1
+test_copy_fixture "standard-library-numbers.lowc" || exit 1
 
 test_copy_fixture "standard-library-numbers-harness.c" || exit 1
 
@@ -79,7 +81,7 @@ for mode in unoptimized optimized; do
     fi
 done
 
-test_render_library_fixture "standard-library-data.lowc" || exit 1
+test_copy_fixture "standard-library-data.lowc" || exit 1
 
 test_copy_fixture "standard-library-data-harness.c" || exit 1
 
@@ -102,7 +104,7 @@ for mode in unoptimized optimized; do
     fi
 done
 
-test_render_library_fixture "standard-library-args.lowc" || exit 1
+test_copy_fixture "standard-library-args.lowc" || exit 1
 
 for mode in unoptimized optimized; do
     if [ "$mode" = optimized ]; then
@@ -124,7 +126,7 @@ for mode in unoptimized optimized; do
     fi
 done
 
-test_render_library_fixture "standard-library-file.lowc" || exit 1
+test_copy_fixture "standard-library-file.lowc" || exit 1
 test_copy_fixture "standard-library-file-harness.c" || exit 1
 
 for mode in unoptimized optimized; do
@@ -147,7 +149,7 @@ for mode in unoptimized optimized; do
     fi
 done
 
-test_render_library_fixture "standard-library-network-http.lowc" || exit 1
+test_copy_fixture "standard-library-network-http.lowc" || exit 1
 test_copy_fixture "standard-library-network-http-harness.c" || exit 1
 test_copy_fixture "standard-library-http-server.c" || exit 1
 

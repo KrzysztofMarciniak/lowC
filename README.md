@@ -1,5 +1,7 @@
 # lowC
 
+**Version 3.0**
+
 A small C-like systems language and compiler.
 
 ## Overview
@@ -606,7 +608,7 @@ Modules can explicitly import functions, structs, and variables:
 
 ```c
 // Import only the name this file needs.
-#include "math.lowc" : "add";
+import math.lowc : add;
 ```
 
 For example:
@@ -626,7 +628,7 @@ s8 square(s8 value) {
 **main.lowc**
 
 ```c
-#include "math.lowc" : "add";
+import math.lowc : add;
 
 void entrypoint(void) {
     s8 result = add(10, 20); // `square` is not imported here.
@@ -634,11 +636,20 @@ void entrypoint(void) {
 }
 ```
 
-Imports are resolved relative to the importing file and can be used for:
+Relative imports are resolved relative to the importing file. Standard-library
+modules use the `public/` path prefix and can be imported for:
 
 * Functions
 * Structs
 * Variables
+
+The `public/` prefix is reserved for standard-library imports and never falls
+back to a project-local `public/` directory. To import a local file there, use
+an explicit relative path:
+
+```c
+import ./public/file.lowc : File;
+```
 
 Only the names listed by an import are visible to that source file. Declarations
 in a module remain available within that module, but imports are not re-exported;
@@ -657,7 +668,7 @@ retained. All declarations in explicitly supplied root source files are kept.
 output on Linux x86-64:
 
 ```c
-#include "/usr/local/share/lowc/public/print.lowc" : "print";
+import public/print.lowc : print;
 
 void entrypoint(void) {
     print("Hello, World\n");
@@ -669,10 +680,8 @@ The `args.lowc` module exposes the process command-line arguments while
 preserving the required `void entrypoint(void)` signature:
 
 ```c
-#include "/usr/local/share/lowc/public/args.lowc" :
-    "args_count", "args_get";
-#include "/usr/local/share/lowc/public/print.lowc" :
-    "print", "print_u8";
+import public/args.lowc : args_count, args_get;
+import public/print.lowc : print, print_u8;
 
 void entrypoint(void) {
     u8 count = args_count();
@@ -716,8 +725,7 @@ decimal. `print_s1`, `print_s2`, `print_s4`, and `print_s8` do the same for
 signed integers. Numeric print functions do not add a newline:
 
 ```c
-#include "/usr/local/share/lowc/public/print.lowc" :
-    "print_u8", "print_s8", "print";
+import public/print.lowc : print_u8, print_s8, print;
 
 void entrypoint(void) {
     print_u8(42);
@@ -730,9 +738,8 @@ void entrypoint(void) {
 Use `strlen` directly by importing `string.lowc`:
 
 ```c
-#include "/usr/local/share/lowc/public/string.lowc" :
-    "strlen", "parse_u8", "strcmp", "strcpy", "strcat", "strdup";
-#include "/usr/local/share/lowc/public/memory.lowc" : "dealloc";
+import public/string.lowc : strlen, parse_u8, strcmp, strcpy, strcat, strdup;
+import public/memory.lowc : dealloc;
 
 u8 string_example(void) {
     u1 *copy = strdup("Hello");
@@ -761,7 +768,7 @@ that should be released with `dealloc`.
 The `memory.lowc` module provides Linux x86-64 `mmap`-backed allocations:
 
 ```c
-#include "/usr/local/share/lowc/public/memory.lowc" : "alloc", "dealloc";
+import public/memory.lowc : alloc, dealloc;
 
 u1 allocation_example(void) {
     u1 *buffer = alloc(128);
@@ -781,9 +788,8 @@ the struct before use; `hashmap_get` returns `(found, value)`, with `(false, 0)`
 when the key does not exist:
 
 ```c
-#include "/usr/local/share/lowc/public/hashmap.lowc" :
-    "HashMap", "hashmap_init", "hashmap_set",
-    "hashmap_get", "hashmap_remove", "hashmap_deinit";
+import public/hashmap.lowc : HashMap, hashmap_init, hashmap_set,
+    hashmap_get, hashmap_remove, hashmap_deinit;
 
 u1 hashmap_example(void) {
     struct HashMap map = 0;
@@ -812,8 +818,7 @@ transferred, zero from `file_read` means end-of-file, and `file_close` releases
 the descriptor:
 
 ```c
-#include "/usr/local/share/lowc/public/file.lowc" :
-    "File", "file_open_write", "file_write", "file_close";
+import public/file.lowc : File, file_open_write, file_write, file_close;
 
 u1 write_example(void) {
     struct File file = 0;
@@ -841,8 +846,7 @@ The `network.lowc` module provides a hostname-resolving TCP client. A
 `TcpConnection` struct owns the connected socket:
 
 ```c
-#include "/usr/local/share/lowc/public/network.lowc" :
-    "TcpConnection", "tcp_connect", "tcp_send", "tcp_receive", "tcp_close";
+import public/network.lowc : TcpConnection, tcp_connect, tcp_send, tcp_receive, tcp_close;
 
 s8 tcp_example(void) {
     struct TcpConnection connection = 0;
@@ -866,7 +870,7 @@ The `http.lowc` module performs a basic plain-HTTP GET and writes the body to a
 caller-provided buffer:
 
 ```c
-#include "/usr/local/share/lowc/public/http.lowc" : "http_get";
+import public/http.lowc : http_get;
 
 s8 http_example(void) {
     u1 body[1024] = 0;
@@ -892,8 +896,9 @@ chunked responses (which are not decoded). Network errors are propagated.
 This initial client uses plain HTTP only; it does not support TLS, redirects,
 proxies, or chunked transfer encoding.
 
-Use your configured `PREFIX` in standard-library import paths when it differs
-from `/usr/local`.
+`public/...` imports resolve beneath the configured `PREFIX/share/lowc` (by
+default `/usr/local/share/lowc`). Set `LOWC_STDLIB_DIR` to override that root
+at runtime, for example when using a staged or custom installation.
 
 ## Formatting
 

@@ -1,6 +1,5 @@
-#include "network.lowc" :
-    "TcpConnection", "tcp_connect", "tcp_send", "tcp_receive", "tcp_close";
-#include "string.lowc" : "strlen";
+import network.lowc : TcpConnection, tcp_connect, tcp_send, tcp_receive, tcp_close;
+import string.lowc : strlen;
 
 u1 __lowc_http_valid_field(u1 *value) {
     u8 index = 0;

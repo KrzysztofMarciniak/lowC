@@ -1,4 +1,4 @@
-#include "memory.lowc" : "alloc", "dealloc";
+import memory.lowc : alloc, dealloc;
 
 struct HashMap {
         u8* keys;

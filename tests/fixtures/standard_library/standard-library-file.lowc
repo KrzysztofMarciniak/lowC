@@ -1,7 +1,6 @@
-#include "@PUBLIC_ROOT@/file.lowc" :
-    "File", "file_open_read", "file_open_write", "file_open_append",
-    "file_read", "file_write", "file_close";
-#include "@PUBLIC_ROOT@/string.lowc" : "strcmp";
+import public/file.lowc : File, file_open_read, file_open_write, file_open_append,
+    file_read, file_write, file_close;
+import public/string.lowc : strcmp;
 
 u8 standard_library_file_test(u1 *path) {
     struct File file = 0;

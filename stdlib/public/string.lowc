@@ -1,5 +1,5 @@
-#include "../internal/string/main.lowc" : "__lowc_strlen";
-#include "memory.lowc" : "alloc";
+import ../internal/string/main.lowc : __lowc_strlen;
+import memory.lowc : alloc;
 
 u8 strlen(u1* data) { return __lowc_strlen(data); }
 

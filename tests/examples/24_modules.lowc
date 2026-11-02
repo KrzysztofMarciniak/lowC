@@ -1,5 +1,5 @@
-#include "math.lowc" : "add", "sub";
-#include "module_values.lowc" : "Point", "base", "module_add", "global_point_x";
+import math.lowc : add, sub;
+import module_values.lowc : Point, base, module_add, global_point_x;
 
 s8 module_math(void) {
     return add(10, 20) + sub(30, 10);

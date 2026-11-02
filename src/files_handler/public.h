@@ -25,6 +25,12 @@ files_handler(
     files *files
 );
 
+char *
+files_handler_resolve_import_path(
+    const char *source_path,
+    const char *import_path
+);
+
 void
 files_handler_handle_error(
     files_handler_result result

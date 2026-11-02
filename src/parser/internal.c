@@ -195,8 +195,11 @@ parser_token_name(
         case TOKEN_VOID:
             return "'void'";
 
-        case TOKEN_INCLUDE:
-            return "'#include'";
+        case TOKEN_IMPORT:
+            return "'import'";
+
+        case TOKEN_IMPORT_PATH:
+            return "import path";
 
         case TOKEN_STRUCT:
             return "'struct'";
@@ -627,7 +630,7 @@ parser_parse_top_level(
         return NULL;
     }
 
-    if (current->type == TOKEN_INCLUDE)
+    if (current->type == TOKEN_IMPORT)
         return parser_parse_import(state);
 
     if (
@@ -665,11 +668,11 @@ parser_parse_import(
         return NULL;
     }
 
-    if (path->type != TOKEN_STRING)
+    if (path->type != TOKEN_IMPORT_PATH)
     {
         parser_set_error(
             state,
-            "expected an import path string."
+            "expected an unquoted import path."
         );
 
         return NULL;
@@ -722,11 +725,11 @@ parser_parse_import(
             return NULL;
         }
 
-        if (name->type != TOKEN_STRING)
+        if (name->type != TOKEN_IDENTIFIER)
         {
             parser_set_error(
                 state,
-                "expected an imported name string."
+                "expected an imported identifier."
             );
 
             parser_free(node);

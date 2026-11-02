@@ -1,4 +1,4 @@
-#include "math.lowc" : "add", "sub";
+import math.lowc : add, sub;
 
 s8 module_math(void) {
     return add(10, 20) + sub(30, 10);

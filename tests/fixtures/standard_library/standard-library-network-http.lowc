@@ -1,7 +1,6 @@
-#include "@PUBLIC_ROOT@/network.lowc" :
-    "TcpConnection", "tcp_connect", "tcp_close";
-#include "@PUBLIC_ROOT@/http.lowc" : "http_get";
-#include "@PUBLIC_ROOT@/string.lowc" : "strcmp";
+import public/network.lowc : TcpConnection, tcp_connect, tcp_close;
+import public/http.lowc : http_get;
+import public/string.lowc : strcmp;
 
 u8 standard_library_network_http_test(u8 port) {
     struct TcpConnection connection = 0;

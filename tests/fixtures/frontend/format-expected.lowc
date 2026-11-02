@@ -1,5 +1,5 @@
-#include "a.lowc" : "a";
-#include "z.lowc" : "z";
+import z.lowc:z;
+import a.lowc:a;
 
 void entrypoint(void) {
         u8 b = 2;

@@ -1,6 +1,5 @@
-#include "../internal/file/main.lowc" :
-    "__lowc_file_open", "__lowc_file_read", "__lowc_file_write",
-    "__lowc_file_close";
+import ../internal/file/main.lowc : __lowc_file_open, __lowc_file_read, __lowc_file_write,
+    __lowc_file_close;
 
 struct File {
     s8 descriptor;

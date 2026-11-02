@@ -58,7 +58,8 @@ lexer(
 
             .position = 0,
             .line = 1,
-            .column = 1
+            .column = 1,
+            .import_path_expected = 0
         };
 
         unsigned long capacity = 16;
@@ -312,8 +313,12 @@ lexer_print_tokens(
                     printf("ASM");
                     break;
 
-                case TOKEN_INCLUDE:
-                    printf("INCLUDE");
+                case TOKEN_IMPORT:
+                    printf("IMPORT");
+                    break;
+
+                case TOKEN_IMPORT_PATH:
+                    printf("IMPORT_PATH");
                     break;
 
                 case TOKEN_PLUS:

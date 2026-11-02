@@ -4,6 +4,7 @@ INSTALL ?= install
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
+LOWC_STDLIB_DIR ?= $(PREFIX)/share/lowc
 LOWC_PUBLIC_DIR ?= $(PREFIX)/share/lowc/public
 LOWC_INTERNAL_DIR ?= $(PREFIX)/share/lowc/internal
 DESTDIR ?=
@@ -30,7 +31,8 @@ DEBUG_CFLAGS := \
 LDFLAGS ?= -Wl,--gc-sections -s
 
 CPPFLAGS := \
-	-Isrc
+	-Isrc \
+	-DLOWC_STDLIB_DIR_DEFAULT='"$(LOWC_STDLIB_DIR)"'
 
 BUILD_DIR := build
 TARGET := $(BUILD_DIR)/lowc

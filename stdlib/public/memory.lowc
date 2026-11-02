@@ -1,4 +1,4 @@
-#include "../internal/memory/main.lowc" : "__lowc_alloc", "__lowc_dealloc";
+import ../internal/memory/main.lowc : __lowc_alloc, __lowc_dealloc;
 
 void* alloc(u8 size) { return __lowc_alloc(size); }
 

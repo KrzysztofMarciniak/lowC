@@ -33,11 +33,8 @@ semantic_import_targets_file(
     const char *declaration_file
 )
 {
-    const char *path;
-    const char *slash;
-    size_t directory_length;
-    size_t path_length;
-    size_t declaration_length;
+    char *resolved_path;
+    int matches;
 
     if (
         !import ||
@@ -49,27 +46,17 @@ semantic_import_targets_file(
         return 0;
     }
 
-    path = import->import.path;
-    if (path[0] == '/') {
-        return strcmp(path, declaration_file) == 0;
+    resolved_path = files_handler_resolve_import_path(
+        import->file,
+        import->import.path
+    );
+    if (!resolved_path) {
+        return 0;
     }
 
-    slash = strrchr(import->file, '/');
-    if (!slash) {
-        return strcmp(path, declaration_file) == 0;
-    }
-
-    directory_length = (size_t)(slash - import->file + 1);
-    path_length = strlen(path);
-    declaration_length = strlen(declaration_file);
-
-    return declaration_length == directory_length + path_length &&
-        memcmp(declaration_file, import->file, directory_length) == 0 &&
-        memcmp(
-            declaration_file + directory_length,
-            path,
-            path_length
-        ) == 0;
+    matches = strcmp(resolved_path, declaration_file) == 0;
+    free(resolved_path);
+    return matches;
 }
 
 int

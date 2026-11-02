@@ -5,27 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-static char *
-lexer_strdup(
-    const char *value
-)
-{
-    char *copy;
-
-    if (value == NULL)
-        return NULL;
-
-    copy = malloc(strlen(value) + 1);
-
-    if (copy == NULL)
-        return NULL;
-
-    strcpy(copy, value);
-
-    return copy;
-}
-
-
 static char
 lexer_current(
     lexer_state *state
@@ -294,6 +273,9 @@ lexer_keyword(
     if (strcmp(value, "foreign") == 0)
         return TOKEN_FOREIGN;
 
+    if (strcmp(value, "import") == 0)
+        return TOKEN_IMPORT;
+
     return TOKEN_IDENTIFIER;
 }
 
@@ -334,8 +316,10 @@ lexer_identifier(
         };
     }
 
-    token_type type =
-        lexer_keyword(value);
+    token_type type = lexer_keyword(value);
+
+    if (type == TOKEN_IMPORT)
+        state->import_path_expected = 1;
 
     return (token) {
         .type = type,
@@ -436,6 +420,43 @@ lexer_string(
     return result;
 }
 
+static token
+lexer_import_path(
+    lexer_state *state,
+    unsigned long line,
+    unsigned long column
+)
+{
+    unsigned long start = state->position;
+
+    while (
+        isalnum((unsigned char)lexer_current(state)) ||
+        lexer_current(state) == '_' ||
+        lexer_current(state) == '-' ||
+        lexer_current(state) == '.' ||
+        lexer_current(state) == '/'
+    ) {
+        lexer_advance(state);
+    }
+
+    if (state->position == start) {
+        return (token) {
+            .type = TOKEN_ERROR,
+            .file = state->file->path,
+            .line = line,
+            .column = column
+        };
+    }
+
+    return lexer_make_token(
+        state,
+        TOKEN_IMPORT_PATH,
+        start,
+        line,
+        column
+    );
+}
+
 token
 lexer_next_token(
     lexer_state *state
@@ -490,6 +511,11 @@ lexer_next_token(
     char next =
         lexer_peek(state);
 
+    if (state->import_path_expected) {
+        state->import_path_expected = 0;
+        return lexer_import_path(state, line, column);
+    }
+
     if (current == '\0')
     {
         return (token) {
@@ -528,38 +554,6 @@ lexer_next_token(
             line,
             column
         );
-    }
-
-    if (current == '#')
-    {
-        if (
-            strncmp(
-                &state->file->content[state->position],
-                "#include",
-                8
-            ) == 0
-        )
-        {
-            for (int index = 0; index < 8; index++)
-                lexer_advance(state);
-
-            return (token) {
-                .type = TOKEN_INCLUDE,
-                .value = lexer_strdup("#include"),
-                .file = state->file->path,
-                .line = line,
-                .column = column
-            };
-        }
-
-        lexer_advance(state);
-
-        return (token) {
-            .type = TOKEN_ERROR,
-            .file = state->file->path,
-            .line = line,
-            .column = column
-        };
     }
 
     if (current == '=' && next == '=')

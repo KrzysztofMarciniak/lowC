@@ -36,35 +36,6 @@ test_copy_fixture() {
     fi
 }
 
-test_render_library_fixture() {
-    local fixture=$1
-
-    test_render_fixture \
-        "$fixture" \
-        "$TEMP_DIR/$fixture" \
-        '@PUBLIC_ROOT@' \
-        "$TEMP_DIR/usr/local/share/lowc/public"
-}
-
-test_render_fixture() {
-    local fixture=$1
-    local destination=$2
-    local token=$3
-    local replacement=$4
-    local source="$FIXTURE_DIR/$TEST_GROUP/$fixture"
-    local line
-
-    if [ ! -f "$source" ]; then
-        test_fail "$TEST_GROUP" "missing fixture '$source'"
-        return 1
-    fi
-
-    while IFS= read -r line || [ -n "$line" ]; do
-        line=${line//"$token"/"$replacement"}
-        printf '%s\n' "$line"
-    done <"$source" >"$destination"
-}
-
 test_fail() {
     local suite=$1
     local label=$2

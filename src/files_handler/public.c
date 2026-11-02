@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef LOWC_STDLIB_DIR_DEFAULT
+#define LOWC_STDLIB_DIR_DEFAULT "/usr/local/share/lowc"
+#endif
+
 static char *
 files_handler_copy_text(
     const char *text,
@@ -33,7 +37,7 @@ files_handler_next_import(
     while (*line != '\0') {
         const char *line_end = strchr(line, '\n');
         const char *cursor = line;
-        const char *quote_end;
+        const char *path_end;
 
         if (!line_end) {
             line_end = line + strlen(line);
@@ -45,32 +49,39 @@ files_handler_next_import(
         }
 
         if (
-            line_end - cursor >= 8 &&
-            memcmp(cursor, "#include", 8) == 0
+            line_end - cursor >= 6 &&
+            memcmp(cursor, "import", 6) == 0 &&
+            (cursor + 6 == line_end ||
+             cursor[6] == ' ' || cursor[6] == '\t' || cursor[6] == '\r')
         ) {
-            cursor += 8;
-            while (cursor < line_end &&
-                   (*cursor == ' ' || *cursor == '\t')) {
+            cursor += 6;
+            while (*cursor != '\0' &&
+                   (*cursor == ' ' || *cursor == '\t' ||
+                    *cursor == '\r' || *cursor == '\n')) {
                 cursor++;
             }
 
-            if (cursor < line_end && *cursor == '"') {
-                cursor++;
-                quote_end = memchr(cursor, '"', (size_t)(line_end - cursor));
-                if (quote_end) {
-                    *import_path = files_handler_copy_text(
-                        cursor,
-                        (size_t)(quote_end - cursor)
-                    );
-                    if (!*import_path) {
-                        return -1;
-                    }
+            path_end = cursor;
+            while (*path_end != '\0' &&
+                   *path_end != ':' && *path_end != ' ' &&
+                   *path_end != '\t' && *path_end != '\r' &&
+                   *path_end != '\n') {
+                path_end++;
+            }
 
-                    *source = *line_end == '\0'
-                        ? line_end
-                        : line_end + 1;
-                    return 1;
+            if (path_end > cursor) {
+                *import_path = files_handler_copy_text(
+                    cursor,
+                    (size_t)(path_end - cursor)
+                );
+                if (!*import_path) {
+                    return -1;
                 }
+
+                *source = *line_end == '\0'
+                    ? line_end
+                    : line_end + 1;
+                return 1;
             }
         }
 
@@ -81,20 +92,54 @@ files_handler_next_import(
     return 0;
 }
 
-static char *
-files_handler_resolve_import(
+char *
+files_handler_resolve_import_path(
     const char *source_path,
     const char *import_path
 )
 {
+    const char *stdlib_root;
     const char *slash;
     size_t directory_length;
     size_t import_length;
+    size_t root_length;
+    int add_separator;
     char *resolved;
 
     if (import_path[0] == '/') {
-        directory_length = 0;
-    } else {
+        return files_handler_copy_text(import_path, strlen(import_path));
+    }
+
+    if (strncmp(import_path, "public/", 7) == 0) {
+        stdlib_root = getenv("LOWC_STDLIB_DIR");
+        if (!stdlib_root || *stdlib_root == '\0') {
+            stdlib_root = LOWC_STDLIB_DIR_DEFAULT;
+        }
+
+        root_length = strlen(stdlib_root);
+        add_separator =
+            root_length != 0 && stdlib_root[root_length - 1] != '/';
+        import_length = strlen(import_path);
+        resolved = malloc(
+            root_length + (size_t)add_separator + import_length + 1
+        );
+        if (!resolved) {
+            return NULL;
+        }
+
+        memcpy(resolved, stdlib_root, root_length);
+        if (add_separator) {
+            resolved[root_length] = '/';
+        }
+        memcpy(
+            resolved + root_length + (size_t)add_separator,
+            import_path,
+            import_length + 1
+        );
+        return resolved;
+    }
+
+    {
         slash = strrchr(source_path, '/');
         directory_length = slash
             ? (size_t)(slash - source_path + 1)
@@ -259,7 +304,7 @@ files_handler(
                     &source,
                     &import_path
                 )) > 0) {
-            char *resolved = files_handler_resolve_import(
+            char *resolved = files_handler_resolve_import_path(
                 values[index].path,
                 import_path
             );

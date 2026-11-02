@@ -1,4 +1,4 @@
-#include "dependencies.lowc" : "live_api", "dead_api";
+import dependencies.lowc : live_api, dead_api;
 
 s8 root_unused(void) {
     return 99;

@@ -1,6 +1,5 @@
-#include "../internal/network/main.lowc" :
-    "__lowc_tcp_connect", "__lowc_tcp_send", "__lowc_tcp_receive",
-    "__lowc_tcp_close";
+import ../internal/network/main.lowc : __lowc_tcp_connect, __lowc_tcp_send, __lowc_tcp_receive,
+    __lowc_tcp_close;
 
 struct TcpConnection {
     s4 descriptor;

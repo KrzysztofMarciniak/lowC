@@ -1,5 +1,5 @@
-#include "@PUBLIC_ROOT@/print.lowc" : "print";
-#include "@PUBLIC_ROOT@/string.lowc" : "strlen";
+import public/print.lowc : print;
+import public/string.lowc : strlen;
 
 void entrypoint(void) {
     u8 length = strlen("Hello, World\n");

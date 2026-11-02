@@ -1,10 +1,7 @@
-#include "@PUBLIC_ROOT@/string.lowc" :
-    "strlen", "strcmp", "strcpy", "strcat", "strdup";
-#include "@PUBLIC_ROOT@/memory.lowc" :
-    "alloc", "dealloc";
-#include "@PUBLIC_ROOT@/hashmap.lowc" :
-    "HashMap", "hashmap_init", "hashmap_set", "hashmap_get",
-    "hashmap_remove", "hashmap_deinit";
+import public/string.lowc : strlen, strcmp, strcpy, strcat, strdup;
+import public/memory.lowc : alloc, dealloc;
+import public/hashmap.lowc : HashMap, hashmap_init, hashmap_set, hashmap_get,
+    hashmap_remove, hashmap_deinit;
 
 u8 standard_library_data_test(void) {
     u1 *buffer = 0;
