@@ -4,6 +4,8 @@
 
 A small C-like systems language and compiler.
 
+![Logo](Logo.png)
+
 ## Table of Contents
 
 - [Overview](#overview)
