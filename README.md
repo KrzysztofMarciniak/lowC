@@ -73,8 +73,10 @@ Build the optimized release compiler with `make` or `make release`:
 make
 ```
 
-This builds `build/lowc` with `-Os`, link-time optimization, dead section
-removal, and stripped symbols. Use `make debug` to build an
+This builds `build/lowc` with `-std=c99`, `-Wall -Wextra -Wpedantic`,
+`-Os`, `-flto`, `-ffunction-sections`, `-fdata-sections`,
+`-fno-unwind-tables`, and `-fno-asynchronous-unwind-tables`; the default
+linker flags are `-Wl,--gc-sections -s`. Use `make debug` to build an
 unoptimized debug executable separately at `build/debug/lowc`.
 The release and portable builds omit compiler unwind tables to reduce their
 size; this can limit stack unwinding in debuggers and crash backtraces.
