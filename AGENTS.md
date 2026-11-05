@@ -20,6 +20,22 @@ These instructions apply to the entire repository.
 
 Run the narrowest relevant test target after changes. Tests require a C compiler driver (`cc` by default).
 
+## lowC command-line options
+
+- Use `--help` and `--version` for compiler information.
+- Output modes are `--tokens`, `--ast`, `--asm`, and `--format`; use `-o <path>` to name an executable.
+- `-optimize` and `-release` request release linking; `-debug` emits debug information and disables optimization unless release optimization is also requested.
+- Link options are `-L<path>`, `-l<name>`, and `-foreign <lang>=<driver>`. C source files can be passed alongside lowC source files.
+- The supported target is `--target=x86_64`. `--format` overwrites source files and requires `clang-format`; see `README.md` for option compatibility and details.
+
+## Language notes
+
+- Integer types use byte widths: unsigned `u1`, `u2`, `u4`, `u8` and signed `s1`, `s2`, `s4`, `s8`.
+- Arrays do not implicitly decay to pointers; take an element address explicitly, such as `&values[0]`.
+- Function definitions require an explicit return on every normal path. No-argument functions use `(void)`, and executables define exactly one `void entrypoint(void)`.
+- lowC functions can return multiple values through tuple assignment; `foreign c` functions use a single return value.
+- Function arguments are evaluated right to left. The language has `for` loops but no `while`, `switch`, `break`, or `continue`.
+
 ## Contribution guidance
 
 - Follow the surrounding C99 style and keep subsystem interfaces consistent with their existing `public` and `internal` files.
